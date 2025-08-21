@@ -2,7 +2,7 @@
   "name": "budibase-fullcalendar",
   "version": "1.0.0",
   "description": "simple calendar component for budibase",
-  "license": "MIT",
+  "license": "timschell",
   "svelte": "index.js",
   "module": "dist/plugin.min.js",
   "scripts": {

@@ -2,8 +2,8 @@
   "type": "component",
   "metadata": {},
   "schema": {
-    "name": "calendar",
-    "friendlyName": "Calendar",
+    "name": "budibase-fullcalendar",
+    "friendlyName": "FullCalendar",
     "description": "simple calendar component for budibase",
     "icon": "Calendar",
     "settings": [
