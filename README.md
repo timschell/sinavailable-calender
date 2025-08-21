@@ -1,6 +1,4 @@
-# BudiBase FullCalendar
-
-https://github.com/pixelinfinito/budibase-fullcalendar/assets/54587190/47821c7e-454a-4e49-b7b8-c01ecde07c6e
+# Calendar
 
 ## Description
 It's a component to implement fullcalendar in your budibase.
@@ -34,22 +32,6 @@ You can use up to two data sources, the first source is mandatory. You can diffe
 3. Group data by color
 4. Change language
 
-## Available plugins
-1. DayGrid ([Month View](https://fullcalendar.io/docs/month-view), [DayGrid View](https://fullcalendar.io/docs/daygrid-view))
-2. List ([List View](https://fullcalendar.io/docs/list-view))
-3. TimeGrid ([TimeGrid View](https://fullcalendar.io/docs/timegrid-view))
-
-
-## Contributing
-
-If you want to contribute to the development of the plugin, follow these steps:
-
-1. Fork this repository.
-2. Create a new branch with your changes: ```git checkout -b my-branch```
-3. Make the desired changes and commit: ```git commit -m 'my changes```
-4. Push your changes to your branch: ```git push origin my-branch```
-5. Open a Pull Request to the original repository.4
-
 
 ## Instructions
 To build this plugin run the following in your Budibase CLI:
@@ -58,9 +40,3 @@ To build this plugin run the following in your Budibase CLI:
 You can also re-build everytime you make a change to your plugin with the command:
 
 ``` budi plugins --watch ```
-
-## Known issues
-
-There are currently no known issues. If you encounter any problems using the plugin for Budibase, please open an issue in this repository and describe the problem in detail.
-
-## Find out more about [Budibase](https://github.com/Budibase/budibase).

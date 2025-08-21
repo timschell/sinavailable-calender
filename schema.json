@@ -2,8 +2,8 @@
   "type": "component",
   "metadata": {},
   "schema": {
-    "name": "budibase-fullcalendar",
-    "friendlyName": "FullCalendar",
+    "name": "calendar",
+    "friendlyName": "Calendar",
     "description": "simple calendar component for budibase",
     "icon": "Calendar",
     "settings": [
@@ -124,14 +124,11 @@
             "type": "select",
             "key": "language",
             "options": [
-              "pt",
-              "en",
-              "fr",
-              "es",
-              "ru"
+              "de",
+              "en"
             ],
             "label": "language",
-            "defaultValue": "pt"
+            "defaultValue": "de"
           },
           {
             "type": "event",
