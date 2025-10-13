@@ -1,12 +1,13 @@
 <script>
   
+  import { createEventDispatcher, onMount } from "svelte";
+  const dispatch = createEventDispatcher();
   import { getContext } from "svelte"	
   import '@fullcalendar/core/locales-all'
   import FullCalendar from 'svelte-fullcalendar';
   import daygridPlugin from '@fullcalendar/daygrid';
   import timeGridPlugin from '@fullcalendar/timegrid';
   import listPlugin from '@fullcalendar/list';
-  import { onMount } from "svelte";
   import {langs, codeLang} from "./lang"
  
   export let language
