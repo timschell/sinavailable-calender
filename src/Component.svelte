@@ -66,13 +66,12 @@
     initialDate:  Date.now(),
     locale: language,
     dayMaxEvents: true,
-    eventClick: (event)=>{
+    eventClick: (event) => {
+      const rowId = event?.event?.extendedProps?.event?._id || "";
       calendarEvent({
-        value: event.event
-      })
-      console.log(JSON.parse(text))
-      console.log(event.event.title)
-    },
+        value: event.event,
+        rowId
+      })},
     events:eventsList,
     eventColor: '#378006',
     theme: true,
