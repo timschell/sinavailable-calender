@@ -8,42 +8,36 @@
 	import { onMount } from 'svelte';
 	import { langs, codeLang } from './lang';
 
-	// Budibase Inputs
 	export let language;
 	export let calendarEvent;
-
 	export let mappingTitle;
 	export let mappingDate;
 	export let mappingStart;
 	export let mappingEnd;
-
 	export let mappingTitle2;
 	export let mappingDate2;
 	export let mappingStart2;
 	export let mappingEnd2;
-
 	export let dataProvider;
 	export let dataProvider2;
-
 	export let mappingColor;
 	export let mappingColor2;
-
 	export let allday;
 	export let allday2;
-
 	export let headerOptionsStart;
 	export let headerOptionsCenter;
 	export let headerOptionsEnd;
-
-	// Umschaltmodus: "counts" (nur Anzahl je Tag) oder "events" (Einzel-Events)
 	export let viewMode = 'counts';
 
-	// ===== Interne States =====
+	// Neue Threshold-Einstellungen
+	export let thresholdGreen = 1;
+	export let thresholdYellow = 3;
+	export let thresholdRed = 4;
+
 	let eventsList = [];
 	let eventsByDate = {};
 	let countsByDate = {};
 
-	// Hilfsfunktionen
 	const toISODate = (val) => {
 		if (!val) return null;
 		const d = new Date(val);
@@ -76,7 +70,7 @@
 					start: row?.[mappingStart],
 					end: row?.[mappingEnd],
 					color: eventColor,
-					event: row, // Original-Row in extendedProps
+					event: row,
 					allDay: allday,
 				};
 				eventsList.push(ev);
@@ -103,31 +97,12 @@
 	};
 
 	onMount(buildEvents);
-
-	// Reaktiv neu aufbauen, wenn Daten oder Mappings wechseln
 	$: JSON.stringify({
 		a: dataProvider?.rows,
 		b: dataProvider2?.rows,
-		m1: {
-			mappingTitle,
-			mappingDate,
-			mappingStart,
-			mappingEnd,
-			allday,
-			mappingColor,
-		},
-		m2: {
-			mappingTitle2,
-			mappingDate2,
-			mappingStart2,
-			mappingEnd2,
-			allday2,
-			mappingColor2,
-		},
 	}),
 		buildEvents();
 
-	// ===== FullCalendar-Optionen (dynamisch) =====
 	const isAggregate = () => viewMode === 'counts';
 
 	const baseOptions = {
@@ -156,15 +131,22 @@
 			: 'dayGridMonth,dayGridWeek,timeGridDay,toggleView';
 	};
 
+	// Farblogik pro Tag
+	const getColorForCount = (count) => {
+		if (count >= thresholdRed) return 'var(--bbfc-red)';
+		if (count >= thresholdYellow) return 'var(--bbfc-yellow)';
+		return 'var(--bbfc-green)';
+	};
+
+	// Darstellung pro Zelle
 	const dayCellContentAgg = (arg) => {
 		const key = arg.date.toISOString().slice(0, 10);
 		const count = countsByDate[key] || 0;
-		const num = arg.dayNumberText;
+		const bg = getColorForCount(count);
 		return {
 			html: `
-        <div class="bbfc-day">
-          <span class="bbfc-day-number">${num}</span>
-          ${count > 0 ? `<span class="bbfc-badge" title="${count} Ereignis${count > 1 ? 'se' : ''}">${count}</span>` : ''}
+        <div class="bbfc-day" style="background:${bg}">
+          <span class="bbfc-count">${count > 0 ? count : ''}</span>
         </div>
       `,
 		};
@@ -179,7 +161,7 @@
 	};
 
 	const onDateClick = (info) => {
-		const dateStr = info.dateStr; // YYYY-MM-DD
+		const dateStr = info.dateStr;
 		const events = eventsByDate[dateStr] || [];
 		calendarEvent({
 			value: { date: dateStr, count: events.length, events },
@@ -195,10 +177,7 @@
 			end: ensureEndToolbar(),
 		},
 		customButtons: makeCustomButtons(),
-
 		events: eventsList,
-
-		// Umschaltbare Teile:
 		eventDisplay: isAggregate() ? 'none' : 'auto',
 		dayCellContent: isAggregate() ? dayCellContentAgg : undefined,
 		dateClick: isAggregate() ? onDateClick : undefined,
@@ -214,26 +193,25 @@
 </div>
 
 <style>
+	:root {
+		--bbfc-green: rgba(76, 175, 80, 0.25);
+		--bbfc-yellow: rgba(255, 235, 59, 0.35);
+		--bbfc-red: rgba(244, 67, 54, 0.35);
+	}
+
 	.bbfc-day {
 		position: relative;
+		height: 100%;
 		display: flex;
 		align-items: center;
-		gap: 0.25rem;
-		padding-right: 0.25rem;
+		justify-content: center;
+		border-radius: 6px;
+		transition: background 0.2s ease-in-out;
 	}
-	.bbfc-day-number {
-		font-weight: 600;
-	}
-	.bbfc-badge {
-		display: inline-block;
-		min-width: 1.25rem;
-		padding: 0 0.375rem;
-		border-radius: 9999px;
-		font-size: 0.75rem;
-		line-height: 1.25rem;
-		text-align: center;
-		background: rgba(25, 118, 210, 0.15);
-		border: 1px solid rgba(25, 118, 210, 0.35);
-		user-select: none;
+
+	.bbfc-count {
+		font-size: 1.5rem;
+		font-weight: 700;
+		color: #1a1a1a;
 	}
 </style>

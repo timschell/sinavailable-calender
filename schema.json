@@ -151,7 +151,31 @@
           { "label": "Events",        "value": "events" }
         ],
         "defaultValue": "counts"
-      } 
+      },
+      {
+        "section": true,
+        "name": "Color Thresholds",
+        "settings": [
+          {
+            "type": "number",
+            "key": "thresholdGreen",
+            "label": "Green threshold (max. events for green)",
+            "defaultValue": 1
+          },
+          {
+            "type": "number",
+            "key": "thresholdYellow",
+            "label": "Yellow threshold (max. events for yellow)",
+            "defaultValue": 3
+          },
+          {
+            "type": "number",
+            "key": "thresholdRed",
+            "label": "Red threshold (min. events for red)",
+            "defaultValue": 4
+          }
+        ]
+      }
     ]
   }
 }
