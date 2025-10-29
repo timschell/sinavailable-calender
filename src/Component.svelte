@@ -1,4 +1,5 @@
 <script>
+	// Komplettdatei. Einfügen, fertig.
 	import { getContext } from 'svelte';
 	import '@fullcalendar/core/locales-all';
 	import FullCalendar from 'svelte-fullcalendar';
@@ -35,19 +36,24 @@
 	export let headerOptionsCenter;
 	export let headerOptionsEnd;
 
-	// Umschalten zwischen "counts" (nur Anzahl je Tag) und "events" (Einzeltermine)
+	// Ansicht: "counts" (aggregiert) oder "events" (Einzeltermine)
 	export let viewMode = 'counts';
 
-	// --- Farb- und Schwellen-Logik (Sidebar) ---
+	// --- Farb-/Schwellen-Logik (Sidebar) ---
 	// Min Farbe: wenn count <= thresholdMin
 	// Neutral Farbe: wenn thresholdMin < count < thresholdMax
 	// Max Farbe: wenn count >= thresholdMax
 	export let thresholdMin = 1;
 	export let thresholdMax = 5;
 
-	export let colorMin = 'rgba(76,175,80,0.25)'; // grünlich
-	export let colorNeutral = 'rgba(255,235,59,0.35)'; // gelblich
-	export let colorMax = 'rgba(244,67,54,0.35)'; // rötlich
+	export let colorMin = 'rgba(76,175,80,0.25)';
+	export let colorNeutral = 'rgba(255,235,59,0.35)';
+	export let colorMax = 'rgba(244,67,54,0.35)';
+
+	// Anzeige-Template im Aggregatmodus (Sidebar):
+	// Platzhalter: {count}, {date}, {iso}, {weekday}
+	// Beispiele: "{count}", "{count} Slots", "frei: {count}"
+	export let displayTemplate = '{count}';
 
 	// --- Interner State ---
 	let eventsList = [];
@@ -85,7 +91,7 @@
 					start: row?.[mappingStart],
 					end: row?.[mappingEnd],
 					color: mappingColor ?? '#313131',
-					event: row, // Original-Row in extendedProps.event
+					event: row,
 					allDay: allday,
 				};
 				eventsList.push(ev);
@@ -112,7 +118,7 @@
 
 	onMount(buildEvents);
 
-	// Rebuild, wenn sich Daten, Mappings, Schwellen oder Farben ändern
+	// Rebuild bei Daten-/Konfig-Änderungen
 	$: JSON.stringify({
 		a: dataProvider?.rows,
 		b: dataProvider2?.rows,
@@ -134,6 +140,7 @@
 		},
 		th: { thresholdMin, thresholdMax },
 		col: { colorMin, colorNeutral, colorMax },
+		dt: displayTemplate,
 	}),
 		buildEvents();
 
@@ -169,16 +176,38 @@
 		if (count >= thresholdMax) return colorMax;
 		if (count <= thresholdMin) return colorMin;
 		if (count > thresholdMin && count < thresholdMax) return colorNeutral;
-		return ''; // count === 0 und Min=0? dann greift oben; sonst neutral leer lassen
+		return '';
 	};
 
-	// komplette Zelle einfärben
+	const sameDay = (d1, d2) =>
+		d1.getFullYear() === d2.getFullYear() &&
+		d1.getMonth() === d2.getMonth() &&
+		d1.getDate() === d2.getDate();
+
+	const formatDisplay = (dateObj, count) => {
+		const iso = dateObj.toISOString().slice(0, 10);
+		const weekday = dateObj.toLocaleDateString(language || 'de', {
+			weekday: 'short',
+		});
+		const dateHuman = dateObj.toLocaleDateString(language || 'de', {
+			day: '2-digit',
+			month: '2-digit',
+			year: 'numeric',
+		});
+		return (displayTemplate || '{count}')
+			.replaceAll('{count}', String(count))
+			.replaceAll('{iso}', iso)
+			.replaceAll('{weekday}', weekday)
+			.replaceAll('{date}', dateHuman);
+	};
+
+	// gesamte Zelle einfärben + Today hervorheben + Klickbarkeit
 	const dayCellDidMountAgg = (arg) => {
 		const key = arg.date.toISOString().slice(0, 10);
 		const count = countsByDate[key] || 0;
 		const bg = colorForCount(count);
 
-		// gesamte Zelle einfärben (ähnlich "Heute"-Highlight)
+		// Hintergrund
 		if (bg) {
 			arg.el.style.background = bg;
 			arg.el.style.borderRadius = '6px';
@@ -186,39 +215,61 @@
 			arg.el.style.background = '';
 		}
 
-		// Tooltip
+		// Heute hervorheben: Rahmen + leicht dunkler
+		const isToday = sameDay(arg.date, new Date());
+		if (isToday) {
+			arg.el.classList.add('bbfc-today');
+		} else {
+			arg.el.classList.remove('bbfc-today');
+		}
+
+		// Klickbarkeit + A11y
+		arg.el.style.cursor = 'pointer';
+		arg.el.setAttribute('role', 'button');
+		arg.el.setAttribute('tabindex', '0');
 		arg.el.title = count > 0 ? `${count} Ereignis${count > 1 ? 'se' : ''}` : '';
 
-		// Klasse, falls globales Styling gewünscht
+		// Für globales Styling
 		arg.el.classList.toggle('bbfc-colored', !!bg);
 	};
 
-	// Tageszahl oben links + Count mittig groß
+	// Inhalt der Zelle (Tageszahl oben links, Text mittig)
 	const dayCellContentAgg = (arg) => {
 		const key = arg.date.toISOString().slice(0, 10);
 		const count = countsByDate[key] || 0;
-		const dayNum = arg.dayNumberText || ''; // FullCalendar liefert hier die sichtbare Nummer
+		const dayNum = arg.dayNumberText || '';
+		const label = count > 0 ? formatDisplay(arg.date, count) : ''; // Template anwenden
 		return {
 			html: `
         <div class="bbfc-wrap">
           <div class="bbfc-daynum">${dayNum}</div>
           <div class="bbfc-center">
-            ${count > 0 ? `<span class="bbfc-count">${count}</span>` : ''}
+            ${label ? `<span class="bbfc-label">${label}</span>` : ''}
           </div>
         </div>
       `,
 		};
 	};
 
+	// Events-Ansicht: Klick auf Event
 	const onEventClick = (event) => {
 		const rowId = event?.event?.extendedProps?.event?._id || '';
 		calendarEvent({ value: event.event, rowId });
 	};
 
+	// Aggregat-Ansicht: Klick auf Tag -> Payload für Modal/Drawer
 	const onDateClick = (info) => {
 		const dateStr = info.dateStr;
 		const events = eventsByDate[dateStr] || [];
-		calendarEvent({ value: { date: dateStr, count: events.length, events } });
+		const count = events.length;
+		const payload = {
+			date: dateStr,
+			count,
+			events,
+			label: formatDisplay(new Date(dateStr), count),
+			isToday: sameDay(new Date(dateStr), new Date()),
+		};
+		calendarEvent({ value: payload });
 	};
 
 	let options;
@@ -250,14 +301,14 @@
 </div>
 
 <style>
-	/* Wrapper füllt die Zelle vollständig */
+	/* Zelle komplett füllen */
 	.bbfc-wrap {
 		position: relative;
 		height: 100%;
 		width: 100%;
 	}
 
-	/* Tageszahl oben links – wie gewohnt sichtbar */
+	/* Tageszahl oben links */
 	.bbfc-daynum {
 		position: absolute;
 		top: 0.35rem;
@@ -266,25 +317,35 @@
 		font-size: 0.9rem;
 		color: #1a1a1a;
 		opacity: 0.9;
+		pointer-events: none;
 	}
 
-	/* Count mittig und groß */
+	/* Mittiger Text */
 	.bbfc-center {
 		position: absolute;
 		inset: 0;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		pointer-events: none;
 	}
-	.bbfc-count {
-		font-size: 1.6rem;
+	.bbfc-label {
+		font-size: 1.1rem;
 		font-weight: 800;
 		line-height: 1;
 		color: #0f172a;
 		text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+		pointer-events: none;
 	}
 
-	/* dezenter Hover auf gefärbten Zellen */
+	/* Heute: deutlicher Rahmen + leichte Abdunklung */
+	.bbfc-today {
+		outline: 3px solid rgba(0, 0, 0, 0.35);
+		outline-offset: -2px;
+		filter: saturate(1.05) brightness(0.98);
+	}
+
+	/* dezenter Hover für gefärbte Zellen */
 	.bbfc-colored:hover {
 		filter: brightness(0.96);
 	}
