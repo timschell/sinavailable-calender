@@ -154,28 +154,22 @@
       },
       {
         "section": true,
-        "name": "Color Settings",
+        "name": "Color Thresholds",
         "settings": [
-          {
-            "type": "color",
-            "key": "colorLow",
-            "label": "Color for low count (green)",
-            "defaultValue": "#C8E6C9"
-          },
-          {
-            "type": "color",
-            "key": "colorMid",
-            "label": "Color for medium count (yellow)",
-            "defaultValue": "#FFF9C4"
-          },
-          {
-            "type": "color",
-            "key": "colorHigh",
-            "label": "Color for high count (red)",
-            "defaultValue": "#FFCDD2"
-          }
+          { "type": "number", "key": "thresholdGreen",  "label": "Green max",  "defaultValue": 1 },
+          { "type": "number", "key": "thresholdYellow", "label": "Yellow max", "defaultValue": 3 },
+          { "type": "number", "key": "thresholdRed",    "label": "Red min",    "defaultValue": 4 }
+        ]
+      },
+      {
+        "section": true,
+        "name": "Colors",
+        "settings": [
+          { "type": "color", "key": "colorGreen",  "label": "Green color",  "defaultValue": "rgba(76,175,80,0.25)" },
+          { "type": "color", "key": "colorYellow", "label": "Yellow color", "defaultValue": "rgba(255,235,59,0.35)" },
+          { "type": "color", "key": "colorRed",    "label": "Red color",    "defaultValue": "rgba(244,67,54,0.35)" }
         ]
       }
     ]
   }
-}
+} 
