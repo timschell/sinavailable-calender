@@ -8,6 +8,7 @@
 	import { onMount } from 'svelte';
 	import { langs, codeLang } from './lang';
 
+	// --- Budibase Inputs ---
 	export let language;
 	export let calendarEvent;
 
@@ -34,18 +35,21 @@
 	export let headerOptionsCenter;
 	export let headerOptionsEnd;
 
-	// Umschalten zwischen "counts" und "events"
+	// Umschalten zwischen "counts" (nur Anzahl je Tag) und "events" (Einzeltermine)
 	export let viewMode = 'counts';
 
-	// Schwellen & Farben aus der Sidebar
-	export let thresholdGreen = 1;
-	export let thresholdYellow = 3;
-	export let thresholdRed = 4;
+	// --- Farb- und Schwellen-Logik (Sidebar) ---
+	// Min Farbe: wenn count <= thresholdMin
+	// Neutral Farbe: wenn thresholdMin < count < thresholdMax
+	// Max Farbe: wenn count >= thresholdMax
+	export let thresholdMin = 1;
+	export let thresholdMax = 5;
 
-	export let colorGreen = 'rgba(76,175,80,0.25)';
-	export let colorYellow = 'rgba(255,235,59,0.35)';
-	export let colorRed = 'rgba(244,67,54,0.35)';
+	export let colorMin = 'rgba(76,175,80,0.25)'; // grünlich
+	export let colorNeutral = 'rgba(255,235,59,0.35)'; // gelblich
+	export let colorMax = 'rgba(244,67,54,0.35)'; // rötlich
 
+	// --- Interner State ---
 	let eventsList = [];
 	let eventsByDate = {};
 	let countsByDate = {};
@@ -81,13 +85,14 @@
 					start: row?.[mappingStart],
 					end: row?.[mappingEnd],
 					color: mappingColor ?? '#313131',
-					event: row,
+					event: row, // Original-Row in extendedProps.event
 					allDay: allday,
 				};
 				eventsList.push(ev);
 				addEventToBuckets(ev);
 			});
 		}
+
 		if (dataProvider2?.rows) {
 			dataProvider2.rows.forEach((row) => {
 				const ev = {
@@ -106,12 +111,29 @@
 	};
 
 	onMount(buildEvents);
-	// Rebuild, wenn Daten/Mappings/Farben/Schwellen wechseln
+
+	// Rebuild, wenn sich Daten, Mappings, Schwellen oder Farben ändern
 	$: JSON.stringify({
 		a: dataProvider?.rows,
 		b: dataProvider2?.rows,
-		t: { thresholdGreen, thresholdYellow, thresholdRed },
-		c: { colorGreen, colorYellow, colorRed },
+		m1: {
+			mappingTitle,
+			mappingDate,
+			mappingStart,
+			mappingEnd,
+			allday,
+			mappingColor,
+		},
+		m2: {
+			mappingTitle2,
+			mappingDate2,
+			mappingStart2,
+			mappingEnd2,
+			allday2,
+			mappingColor2,
+		},
+		th: { thresholdMin, thresholdMax },
+		col: { colorMin, colorNeutral, colorMax },
 	}),
 		buildEvents();
 
@@ -130,7 +152,9 @@
 	const makeCustomButtons = () => ({
 		toggleView: {
 			text: isAggregate() ? 'Events' : 'Anzahl',
-			click: () => (viewMode = isAggregate() ? 'events' : 'counts'),
+			click: () => {
+				viewMode = isAggregate() ? 'events' : 'counts';
+			},
 		},
 	});
 
@@ -141,21 +165,20 @@
 			: 'dayGridMonth,dayGridWeek,timeGridDay,toggleView';
 	};
 
-	// Farbe nach Count bestimmen
 	const colorForCount = (count) => {
-		if (count >= thresholdRed) return colorRed;
-		if (count >= thresholdYellow) return colorYellow;
-		if (count > 0) return colorGreen;
-		return ''; // 0 = keine Füllfarbe
+		if (count >= thresholdMax) return colorMax;
+		if (count <= thresholdMin) return colorMin;
+		if (count > thresholdMin && count < thresholdMax) return colorNeutral;
+		return ''; // count === 0 und Min=0? dann greift oben; sonst neutral leer lassen
 	};
 
-	// Ganze Zelle färben + Inhalt mit Tag + großer Count
+	// komplette Zelle einfärben
 	const dayCellDidMountAgg = (arg) => {
 		const key = arg.date.toISOString().slice(0, 10);
 		const count = countsByDate[key] || 0;
 		const bg = colorForCount(count);
 
-		// komplette td einfärben (inline style gewinnt gegen Default)
+		// gesamte Zelle einfärben (ähnlich "Heute"-Highlight)
 		if (bg) {
 			arg.el.style.background = bg;
 			arg.el.style.borderRadius = '6px';
@@ -163,18 +186,18 @@
 			arg.el.style.background = '';
 		}
 
-		// Titel (Tooltip) mit Count
+		// Tooltip
 		arg.el.title = count > 0 ? `${count} Ereignis${count > 1 ? 'se' : ''}` : '';
 
-		// Klasse setzen (falls du global stylen willst)
+		// Klasse, falls globales Styling gewünscht
 		arg.el.classList.toggle('bbfc-colored', !!bg);
 	};
 
-	// Inhalt der Zelle: Tag oben links + Count mittig groß
+	// Tageszahl oben links + Count mittig groß
 	const dayCellContentAgg = (arg) => {
 		const key = arg.date.toISOString().slice(0, 10);
 		const count = countsByDate[key] || 0;
-		const dayNum = arg.dayNumberText; // z.B. "28"
+		const dayNum = arg.dayNumberText || ''; // FullCalendar liefert hier die sichtbare Nummer
 		return {
 			html: `
         <div class="bbfc-wrap">
@@ -210,7 +233,7 @@
 
 		events: eventsList,
 
-		// Umschaltbar:
+		// Umschaltbarer Modus
 		eventDisplay: isAggregate() ? 'none' : 'auto',
 		dayCellContent: isAggregate() ? dayCellContentAgg : undefined,
 		dayCellDidMount: isAggregate() ? dayCellDidMountAgg : undefined,
@@ -227,14 +250,14 @@
 </div>
 
 <style>
-	/* Wrapper füllt die Zelle */
+	/* Wrapper füllt die Zelle vollständig */
 	.bbfc-wrap {
 		position: relative;
 		height: 100%;
 		width: 100%;
 	}
 
-	/* Tageszahl oben links wie gewohnt */
+	/* Tageszahl oben links – wie gewohnt sichtbar */
 	.bbfc-daynum {
 		position: absolute;
 		top: 0.35rem;
@@ -257,11 +280,11 @@
 		font-size: 1.6rem;
 		font-weight: 800;
 		line-height: 1;
-		color: #0f172a; /* fast-schwarz, bleibt auf allen BGs lesbar */
+		color: #0f172a;
 		text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
 	}
 
-	/* Optional Hover-Effekt für farbige Felder */
+	/* dezenter Hover auf gefärbten Zellen */
 	.bbfc-colored:hover {
 		filter: brightness(0.96);
 	}

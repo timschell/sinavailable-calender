@@ -154,20 +154,43 @@
       },
       {
         "section": true,
-        "name": "Color Thresholds",
+        "name": "Event-Farbsteuerung",
         "settings": [
-          { "type": "number", "key": "thresholdGreen",  "label": "Green max",  "defaultValue": 1 },
-          { "type": "number", "key": "thresholdYellow", "label": "Yellow max", "defaultValue": 3 },
-          { "type": "number", "key": "thresholdRed",    "label": "Red min",    "defaultValue": 4 }
-        ]
-      },
-      {
-        "section": true,
-        "name": "Colors",
-        "settings": [
-          { "type": "color", "key": "colorGreen",  "label": "Green color",  "defaultValue": "rgba(76,175,80,0.25)" },
-          { "type": "color", "key": "colorYellow", "label": "Yellow color", "defaultValue": "rgba(255,235,59,0.35)" },
-          { "type": "color", "key": "colorRed",    "label": "Red color",    "defaultValue": "rgba(244,67,54,0.35)" }
+          {
+            "type": "number",
+            "key": "thresholdMin",
+            "label": "Min-Wert",
+            "defaultValue": 1,
+            "helperText": "Wenn die Anzahl der Events kleiner oder gleich diesem Wert ist, wird die Min-Farbe angezeigt."
+          },
+          {
+            "type": "number",
+            "key": "thresholdMax",
+            "label": "Max-Wert",
+            "defaultValue": 5,
+            "helperText": "Wenn die Anzahl der Events größer oder gleich diesem Wert ist, wird die Max-Farbe angezeigt."
+          },
+          {
+            "type": "color",
+            "key": "colorMin",
+            "label": "Min Farbe",
+            "defaultValue": "rgba(76,175,80,0.25)",
+            "helperText": "Farbe für Tage mit niedriger Auslastung (<= Min-Wert)."
+          },
+          {
+            "type": "color",
+            "key": "colorNeutral",
+            "label": "Neutral Farbe",
+            "defaultValue": "rgba(255,235,59,0.35)",
+            "helperText": "Farbe für Tage mit mittlerer Auslastung (zwischen Min- und Max-Wert)."
+          },
+          {
+            "type": "color",
+            "key": "colorMax",
+            "label": "Max Farbe",
+            "defaultValue": "rgba(244,67,54,0.35)",
+            "helperText": "Farbe für Tage mit hoher Auslastung (>= Max-Wert)."
+          }
         ]
       }
     ]
