@@ -141,7 +141,17 @@
             ]
           }
         ]
-      }
+      },
+      {
+        "type": "select",
+        "key": "viewMode",
+        "label": "View mode",
+        "options": [
+          { "label": "Counts per day", "value": "counts" },
+          { "label": "Events",        "value": "events" }
+        ],
+        "defaultValue": "counts"
+      } 
     ]
   }
 }
