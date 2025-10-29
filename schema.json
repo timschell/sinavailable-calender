@@ -154,25 +154,25 @@
       },
       {
         "section": true,
-        "name": "Color Thresholds",
+        "name": "Color Settings",
         "settings": [
           {
-            "type": "number",
-            "key": "thresholdGreen",
-            "label": "Green threshold (max. events for green)",
-            "defaultValue": 1
+            "type": "color",
+            "key": "colorLow",
+            "label": "Color for low count (green)",
+            "defaultValue": "#C8E6C9"
           },
           {
-            "type": "number",
-            "key": "thresholdYellow",
-            "label": "Yellow threshold (max. events for yellow)",
-            "defaultValue": 3
+            "type": "color",
+            "key": "colorMid",
+            "label": "Color for medium count (yellow)",
+            "defaultValue": "#FFF9C4"
           },
           {
-            "type": "number",
-            "key": "thresholdRed",
-            "label": "Red threshold (min. events for red)",
-            "defaultValue": 4
+            "type": "color",
+            "key": "colorHigh",
+            "label": "Color for high count (red)",
+            "defaultValue": "#FFCDD2"
           }
         ]
       }
