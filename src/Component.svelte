@@ -1,11 +1,12 @@
 <script>
-	// Komplettdatei. Einfügen, fertig.
+	// Vollständige Component.svelte
 	import { getContext } from 'svelte';
 	import '@fullcalendar/core/locales-all';
 	import FullCalendar from 'svelte-fullcalendar';
 	import daygridPlugin from '@fullcalendar/daygrid';
 	import timeGridPlugin from '@fullcalendar/timegrid';
 	import listPlugin from '@fullcalendar/list';
+	import interactionPlugin from '@fullcalendar/interaction'; // <- wichtig für dateClick
 	import { onMount } from 'svelte';
 	import { langs, codeLang } from './lang';
 
@@ -50,9 +51,8 @@
 	export let colorNeutral = 'rgba(255,235,59,0.35)';
 	export let colorMax = 'rgba(244,67,54,0.35)';
 
-	// Anzeige-Template im Aggregatmodus (Sidebar):
+	// Anzeige-Template im Aggregatmodus
 	// Platzhalter: {count}, {date}, {iso}, {weekday}
-	// Beispiele: "{count}", "{count} Slots", "frei: {count}"
 	export let displayTemplate = '{count}';
 
 	// --- Interner State ---
@@ -147,11 +147,13 @@
 	const isAggregate = () => viewMode === 'counts';
 
 	const baseOptions = {
-		plugins: [daygridPlugin, listPlugin, timeGridPlugin],
+		plugins: [daygridPlugin, listPlugin, timeGridPlugin, interactionPlugin], // <- interaction drin
 		initialDate: Date.now(),
 		locale: language,
 		dayMaxEvents: true,
 		firstDay: 1,
+		navLinks: true, // erlaubt Klicks auf Tages-/Wochennamen
+		selectable: false, // wir nutzen keine Drag-Selection
 		theme: true,
 		...langs[codeLang(language)],
 	};
@@ -201,13 +203,13 @@
 			.replaceAll('{date}', dateHuman);
 	};
 
-	// gesamte Zelle einfärben + Today hervorheben + Klickbarkeit
+	// ganze Zelle einfärben + Today hervorheben + klickbar
 	const dayCellDidMountAgg = (arg) => {
 		const key = arg.date.toISOString().slice(0, 10);
 		const count = countsByDate[key] || 0;
 		const bg = colorForCount(count);
 
-		// Hintergrund
+		// Hintergrund setzen
 		if (bg) {
 			arg.el.style.background = bg;
 			arg.el.style.borderRadius = '6px';
@@ -215,37 +217,34 @@
 			arg.el.style.background = '';
 		}
 
-		// Heute hervorheben: Rahmen + leicht dunkler
-		const isToday = sameDay(arg.date, new Date());
-		if (isToday) {
+		// heute hervorheben
+		if (sameDay(arg.date, new Date())) {
 			arg.el.classList.add('bbfc-today');
 		} else {
 			arg.el.classList.remove('bbfc-today');
 		}
 
-		// Klickbarkeit + A11y
+		// Klickbarkeit + Fokus
 		arg.el.style.cursor = 'pointer';
 		arg.el.setAttribute('role', 'button');
 		arg.el.setAttribute('tabindex', '0');
 		arg.el.title = count > 0 ? `${count} Ereignis${count > 1 ? 'se' : ''}` : '';
 
-		// Für globales Styling
+		// für CSS
 		arg.el.classList.toggle('bbfc-colored', !!bg);
 	};
 
-	// Inhalt der Zelle (Tageszahl oben links, Text mittig)
+	// Zellinhalt (Tageszahl + zentrierter Text)
 	const dayCellContentAgg = (arg) => {
 		const key = arg.date.toISOString().slice(0, 10);
 		const count = countsByDate[key] || 0;
 		const dayNum = arg.dayNumberText || '';
-		const label = count > 0 ? formatDisplay(arg.date, count) : ''; // Template anwenden
+		const label = count > 0 ? formatDisplay(arg.date, count) : '';
 		return {
 			html: `
         <div class="bbfc-wrap">
           <div class="bbfc-daynum">${dayNum}</div>
-          <div class="bbfc-center">
-            ${label ? `<span class="bbfc-label">${label}</span>` : ''}
-          </div>
+          <div class="bbfc-center">${label ? `<span class="bbfc-label">${label}</span>` : ''}</div>
         </div>
       `,
 		};
@@ -257,7 +256,7 @@
 		calendarEvent({ value: event.event, rowId });
 	};
 
-	// Aggregat-Ansicht: Klick auf Tag -> Payload für Modal/Drawer
+	// Counts-Ansicht: Klick auf Tag
 	const onDateClick = (info) => {
 		const dateStr = info.dateStr;
 		const events = eventsByDate[dateStr] || [];
@@ -301,14 +300,12 @@
 </div>
 
 <style>
-	/* Zelle komplett füllen */
 	.bbfc-wrap {
 		position: relative;
 		height: 100%;
 		width: 100%;
 	}
 
-	/* Tageszahl oben links */
 	.bbfc-daynum {
 		position: absolute;
 		top: 0.35rem;
@@ -317,35 +314,32 @@
 		font-size: 0.9rem;
 		color: #1a1a1a;
 		opacity: 0.9;
-		pointer-events: none;
+		pointer-events: none; /* blockiert nicht den Klick */
 	}
 
-	/* Mittiger Text */
 	.bbfc-center {
 		position: absolute;
 		inset: 0;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		pointer-events: none;
+		pointer-events: none; /* Zellenklick geht durch */
 	}
+
 	.bbfc-label {
 		font-size: 1.1rem;
 		font-weight: 800;
 		line-height: 1;
 		color: #0f172a;
 		text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
-		pointer-events: none;
 	}
 
-	/* Heute: deutlicher Rahmen + leichte Abdunklung */
 	.bbfc-today {
 		outline: 3px solid rgba(0, 0, 0, 0.35);
 		outline-offset: -2px;
 		filter: saturate(1.05) brightness(0.98);
 	}
 
-	/* dezenter Hover für gefärbte Zellen */
 	.bbfc-colored:hover {
 		filter: brightness(0.96);
 	}
