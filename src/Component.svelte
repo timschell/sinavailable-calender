@@ -1,12 +1,12 @@
 <script>
-	// Vollständige Component.svelte
+	// Komplette, bereinigte Datei.
 	import { getContext } from 'svelte';
 	import '@fullcalendar/core/locales-all';
 	import FullCalendar from 'svelte-fullcalendar';
 	import daygridPlugin from '@fullcalendar/daygrid';
 	import timeGridPlugin from '@fullcalendar/timegrid';
 	import listPlugin from '@fullcalendar/list';
-	import interactionPlugin from '@fullcalendar/interaction'; // <- wichtig für dateClick
+	import interactionPlugin from '@fullcalendar/interaction'; // wichtig für dateClick
 	import { onMount } from 'svelte';
 	import { langs, codeLang } from './lang';
 
@@ -40,10 +40,7 @@
 	// Ansicht: "counts" (aggregiert) oder "events" (Einzeltermine)
 	export let viewMode = 'counts';
 
-	// --- Farb-/Schwellen-Logik (Sidebar) ---
-	// Min Farbe: wenn count <= thresholdMin
-	// Neutral Farbe: wenn thresholdMin < count < thresholdMax
-	// Max Farbe: wenn count >= thresholdMax
+	// Farb-/Schwellen-Logik (Sidebar)
 	export let thresholdMin = 1;
 	export let thresholdMax = 5;
 
@@ -60,10 +57,18 @@
 	let eventsByDate = {};
 	let countsByDate = {};
 
+	const safeDate = (val) => {
+		try {
+			const d = val instanceof Date ? val : new Date(val);
+			return isNaN(d) ? null : d;
+		} catch {
+			return null;
+		}
+	};
+
 	const toISODate = (val) => {
-		if (!val) return null;
-		const d = new Date(val);
-		if (isNaN(d)) return null;
+		const d = safeDate(val);
+		if (!d) return null;
 		const y = d.getFullYear();
 		const m = String(d.getMonth() + 1).padStart(2, '0');
 		const day = String(d.getDate()).padStart(2, '0');
@@ -83,36 +88,40 @@
 		eventsByDate = {};
 		countsByDate = {};
 
-		if (dataProvider?.rows) {
-			dataProvider.rows.forEach((row) => {
-				const ev = {
-					title: row?.[mappingTitle],
-					date: row?.[mappingDate],
-					start: row?.[mappingStart],
-					end: row?.[mappingEnd],
-					color: mappingColor ?? '#313131',
-					event: row,
-					allDay: allday,
-				};
-				eventsList.push(ev);
-				addEventToBuckets(ev);
-			});
-		}
+		try {
+			if (dataProvider?.rows?.length) {
+				for (const row of dataProvider.rows) {
+					const ev = {
+						title: row?.[mappingTitle],
+						date: row?.[mappingDate],
+						start: row?.[mappingStart],
+						end: row?.[mappingEnd],
+						color: mappingColor ?? '#313131',
+						event: row,
+						allDay: allday,
+					};
+					eventsList.push(ev);
+					addEventToBuckets(ev);
+				}
+			}
 
-		if (dataProvider2?.rows) {
-			dataProvider2.rows.forEach((row) => {
-				const ev = {
-					title: row?.[mappingTitle2],
-					date: row?.[mappingDate2],
-					start: row?.[mappingStart2],
-					end: row?.[mappingEnd2],
-					color: mappingColor2 ?? '#eb4034',
-					event: row,
-					allDay: allday2,
-				};
-				eventsList.push(ev);
-				addEventToBuckets(ev);
-			});
+			if (dataProvider2?.rows?.length) {
+				for (const row of dataProvider2.rows) {
+					const ev = {
+						title: row?.[mappingTitle2],
+						date: row?.[mappingDate2],
+						start: row?.[mappingStart2],
+						end: row?.[mappingEnd2],
+						color: mappingColor2 ?? '#eb4034',
+						event: row,
+						allDay: allday2,
+					};
+					eventsList.push(ev);
+					addEventToBuckets(ev);
+				}
+			}
+		} catch (e) {
+			console.error('buildEvents error:', e);
 		}
 	};
 
@@ -141,21 +150,22 @@
 		th: { thresholdMin, thresholdMax },
 		col: { colorMin, colorNeutral, colorMax },
 		dt: displayTemplate,
+		vm: viewMode,
 	}),
 		buildEvents();
 
 	const isAggregate = () => viewMode === 'counts';
 
 	const baseOptions = {
-		plugins: [daygridPlugin, listPlugin, timeGridPlugin, interactionPlugin], // <- interaction drin
-		initialDate: Date.now(),
-		locale: language,
+		plugins: [daygridPlugin, listPlugin, timeGridPlugin, interactionPlugin],
+		initialDate: new Date(), // statt Date.now()
+		locale: language || 'de',
 		dayMaxEvents: true,
 		firstDay: 1,
-		navLinks: true, // erlaubt Klicks auf Tages-/Wochennamen
-		selectable: false, // wir nutzen keine Drag-Selection
+		navLinks: true,
+		selectable: false,
 		theme: true,
-		...langs[codeLang(language)],
+		...langs[codeLang(language || 'de')],
 	};
 
 	const makeCustomButtons = () => ({
@@ -175,6 +185,7 @@
 	};
 
 	const colorForCount = (count) => {
+		if (typeof count !== 'number') return '';
 		if (count >= thresholdMax) return colorMax;
 		if (count <= thresholdMin) return colorMin;
 		if (count > thresholdMin && count < thresholdMax) return colorNeutral;
@@ -182,93 +193,112 @@
 	};
 
 	const sameDay = (d1, d2) =>
-		d1.getFullYear() === d2.getFullYear() &&
-		d1.getMonth() === d2.getMonth() &&
-		d1.getDate() === d2.getDate();
+		d1?.getFullYear?.() === d2?.getFullYear?.() &&
+		d1?.getMonth?.() === d2?.getMonth?.() &&
+		d1?.getDate?.() === d2?.getDate?.();
 
 	const formatDisplay = (dateObj, count) => {
-		const iso = dateObj.toISOString().slice(0, 10);
-		const weekday = dateObj.toLocaleDateString(language || 'de', {
-			weekday: 'short',
-		});
-		const dateHuman = dateObj.toLocaleDateString(language || 'de', {
-			day: '2-digit',
-			month: '2-digit',
-			year: 'numeric',
-		});
-		return (displayTemplate || '{count}')
-			.replaceAll('{count}', String(count))
-			.replaceAll('{iso}', iso)
-			.replaceAll('{weekday}', weekday)
-			.replaceAll('{date}', dateHuman);
+		try {
+			const d = safeDate(dateObj) || new Date();
+			const iso = d.toISOString().slice(0, 10);
+			const weekday = d.toLocaleDateString(language || 'de', {
+				weekday: 'short',
+			});
+			const dateHuman = d.toLocaleDateString(language || 'de', {
+				day: '2-digit',
+				month: '2-digit',
+				year: 'numeric',
+			});
+			return (displayTemplate || '{count}')
+				.replaceAll('{count}', String(count ?? 0))
+				.replaceAll('{iso}', iso)
+				.replaceAll('{weekday}', weekday)
+				.replaceAll('{date}', dateHuman);
+		} catch (e) {
+			console.error('formatDisplay error:', e);
+			return String(count ?? 0);
+		}
 	};
 
 	// ganze Zelle einfärben + Today hervorheben + klickbar
 	const dayCellDidMountAgg = (arg) => {
-		const key = arg.date.toISOString().slice(0, 10);
-		const count = countsByDate[key] || 0;
-		const bg = colorForCount(count);
+		try {
+			const key = arg?.date?.toISOString?.().slice(0, 10);
+			const count = key ? countsByDate[key] || 0 : 0;
+			const bg = colorForCount(count);
 
-		// Hintergrund setzen
-		if (bg) {
-			arg.el.style.background = bg;
-			arg.el.style.borderRadius = '6px';
-		} else {
-			arg.el.style.background = '';
+			if (bg) {
+				arg.el.style.background = bg;
+				arg.el.style.borderRadius = '6px';
+			} else {
+				arg.el.style.background = '';
+			}
+
+			if (sameDay(arg.date, new Date())) {
+				arg.el.classList.add('bbfc-today');
+			} else {
+				arg.el.classList.remove('bbfc-today');
+			}
+
+			arg.el.style.cursor = 'pointer';
+			arg.el.setAttribute('role', 'button');
+			arg.el.setAttribute('tabindex', '0');
+			arg.el.title =
+				count > 0 ? `${count} Ereignis${count > 1 ? 'se' : ''}` : '';
+			arg.el.classList.toggle('bbfc-colored', !!bg);
+		} catch (e) {
+			console.error('dayCellDidMountAgg error:', e);
 		}
-
-		// heute hervorheben
-		if (sameDay(arg.date, new Date())) {
-			arg.el.classList.add('bbfc-today');
-		} else {
-			arg.el.classList.remove('bbfc-today');
-		}
-
-		// Klickbarkeit + Fokus
-		arg.el.style.cursor = 'pointer';
-		arg.el.setAttribute('role', 'button');
-		arg.el.setAttribute('tabindex', '0');
-		arg.el.title = count > 0 ? `${count} Ereignis${count > 1 ? 'se' : ''}` : '';
-
-		// für CSS
-		arg.el.classList.toggle('bbfc-colored', !!bg);
 	};
 
 	// Zellinhalt (Tageszahl + zentrierter Text)
 	const dayCellContentAgg = (arg) => {
-		const key = arg.date.toISOString().slice(0, 10);
-		const count = countsByDate[key] || 0;
-		const dayNum = arg.dayNumberText || '';
-		const label = count > 0 ? formatDisplay(arg.date, count) : '';
-		return {
-			html: `
-        <div class="bbfc-wrap">
-          <div class="bbfc-daynum">${dayNum}</div>
-          <div class="bbfc-center">${label ? `<span class="bbfc-label">${label}</span>` : ''}</div>
-        </div>
-      `,
-		};
+		try {
+			const key = arg?.date?.toISOString?.().slice(0, 10);
+			const count = key ? countsByDate[key] || 0 : 0;
+			const dayNum = arg?.dayNumberText || '';
+			const label = count > 0 ? formatDisplay(arg.date, count) : '';
+			return {
+				html: `
+          <div class="bbfc-wrap">
+            <div class="bbfc-daynum">${dayNum}</div>
+            <div class="bbfc-center">${label ? `<span class="bbfc-label">${label}</span>` : ''}</div>
+          </div>
+        `,
+			};
+		} catch (e) {
+			console.error('dayCellContentAgg error:', e);
+			return { html: '' };
+		}
 	};
 
 	// Events-Ansicht: Klick auf Event
 	const onEventClick = (event) => {
-		const rowId = event?.event?.extendedProps?.event?._id || '';
-		calendarEvent({ value: event.event, rowId });
+		try {
+			const rowId = event?.event?.extendedProps?.event?._id || '';
+			calendarEvent?.({ value: event.event, rowId });
+		} catch (e) {
+			console.error('onEventClick error:', e);
+		}
 	};
 
 	// Counts-Ansicht: Klick auf Tag
 	const onDateClick = (info) => {
-		const dateStr = info.dateStr;
-		const events = eventsByDate[dateStr] || [];
-		const count = events.length;
-		const payload = {
-			date: dateStr,
-			count,
-			events,
-			label: formatDisplay(new Date(dateStr), count),
-			isToday: sameDay(new Date(dateStr), new Date()),
-		};
-		calendarEvent({ value: payload });
+		try {
+			const dateStr = info?.dateStr;
+			const events = dateStr ? eventsByDate[dateStr] || [] : [];
+			const count = events.length;
+			const payload = {
+				date: dateStr,
+				count,
+				events,
+				label: formatDisplay(safeDate(dateStr), count),
+				isToday: sameDay(safeDate(dateStr), new Date()),
+			};
+			calendarEvent?.({ value: payload });
+		} catch (e) {
+			console.error('onDateClick error:', e);
+		}
 	};
 
 	let options;
@@ -280,7 +310,6 @@
 			end: ensureEndToolbar(),
 		},
 		customButtons: makeCustomButtons(),
-
 		events: eventsList,
 
 		// Umschaltbarer Modus
@@ -314,7 +343,7 @@
 		font-size: 0.9rem;
 		color: #1a1a1a;
 		opacity: 0.9;
-		pointer-events: none; /* blockiert nicht den Klick */
+		pointer-events: none;
 	}
 
 	.bbfc-center {
@@ -323,7 +352,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		pointer-events: none; /* Zellenklick geht durch */
+		pointer-events: none;
 	}
 
 	.bbfc-label {
