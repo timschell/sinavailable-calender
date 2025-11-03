@@ -1,15 +1,14 @@
 <script>
-	// Komplettdatei. Einfügen, fertig.
 	import { getContext } from 'svelte';
 	import '@fullcalendar/core/locales-all';
 	import FullCalendar from 'svelte-fullcalendar';
 	import daygridPlugin from '@fullcalendar/daygrid';
 	import timeGridPlugin from '@fullcalendar/timegrid';
 	import listPlugin from '@fullcalendar/list';
+	import interactionPlugin from '@fullcalendar/interaction'; // ← entscheidend!
 	import { onMount } from 'svelte';
 	import { langs, codeLang } from './lang';
 
-	// --- Budibase Inputs ---
 	export let language;
 	export let calendarEvent;
 
@@ -36,13 +35,8 @@
 	export let headerOptionsCenter;
 	export let headerOptionsEnd;
 
-	// Ansicht: "counts" (aggregiert) oder "events" (Einzeltermine)
 	export let viewMode = 'counts';
 
-	// --- Farb-/Schwellen-Logik (Sidebar) ---
-	// Min Farbe: wenn count <= thresholdMin
-	// Neutral Farbe: wenn thresholdMin < count < thresholdMax
-	// Max Farbe: wenn count >= thresholdMax
 	export let thresholdMin = 1;
 	export let thresholdMax = 5;
 
@@ -50,12 +44,8 @@
 	export let colorNeutral = 'rgba(255,235,59,0.35)';
 	export let colorMax = 'rgba(244,67,54,0.35)';
 
-	// Anzeige-Template im Aggregatmodus (Sidebar):
-	// Platzhalter: {count}, {date}, {iso}, {weekday}
-	// Beispiele: "{count}", "{count} Slots", "frei: {count}"
 	export let displayTemplate = '{count}';
 
-	// --- Interner State ---
 	let eventsList = [];
 	let eventsByDate = {};
 	let countsByDate = {};
@@ -64,10 +54,7 @@
 		if (!val) return null;
 		const d = new Date(val);
 		if (isNaN(d)) return null;
-		const y = d.getFullYear();
-		const m = String(d.getMonth() + 1).padStart(2, '0');
-		const day = String(d.getDate()).padStart(2, '0');
-		return `${y}-${m}-${day}`;
+		return d.toISOString().slice(0, 10);
 	};
 
 	const addEventToBuckets = (ev) => {
@@ -118,26 +105,9 @@
 
 	onMount(buildEvents);
 
-	// Rebuild bei Daten-/Konfig-Änderungen
 	$: JSON.stringify({
 		a: dataProvider?.rows,
 		b: dataProvider2?.rows,
-		m1: {
-			mappingTitle,
-			mappingDate,
-			mappingStart,
-			mappingEnd,
-			allday,
-			mappingColor,
-		},
-		m2: {
-			mappingTitle2,
-			mappingDate2,
-			mappingStart2,
-			mappingEnd2,
-			allday2,
-			mappingColor2,
-		},
 		th: { thresholdMin, thresholdMax },
 		col: { colorMin, colorNeutral, colorMax },
 		dt: displayTemplate,
@@ -147,8 +117,8 @@
 	const isAggregate = () => viewMode === 'counts';
 
 	const baseOptions = {
-		plugins: [daygridPlugin, listPlugin, timeGridPlugin],
-		initialDate: Date.now(),
+		plugins: [daygridPlugin, listPlugin, timeGridPlugin, interactionPlugin], // ← hier ist’s drin!
+		initialDate: new Date(),
 		locale: language,
 		dayMaxEvents: true,
 		firstDay: 1,
@@ -159,9 +129,7 @@
 	const makeCustomButtons = () => ({
 		toggleView: {
 			text: isAggregate() ? 'Events' : 'Anzahl',
-			click: () => {
-				viewMode = isAggregate() ? 'events' : 'counts';
-			},
+			click: () => (viewMode = isAggregate() ? 'events' : 'counts'),
 		},
 	});
 
@@ -175,8 +143,7 @@
 	const colorForCount = (count) => {
 		if (count >= thresholdMax) return colorMax;
 		if (count <= thresholdMin) return colorMin;
-		if (count > thresholdMin && count < thresholdMax) return colorNeutral;
-		return '';
+		return colorNeutral;
 	};
 
 	const sameDay = (d1, d2) =>
@@ -201,63 +168,43 @@
 			.replaceAll('{date}', dateHuman);
 	};
 
-	// gesamte Zelle einfärben + Today hervorheben + Klickbarkeit
 	const dayCellDidMountAgg = (arg) => {
 		const key = arg.date.toISOString().slice(0, 10);
 		const count = countsByDate[key] || 0;
 		const bg = colorForCount(count);
 
-		// Hintergrund
 		if (bg) {
 			arg.el.style.background = bg;
 			arg.el.style.borderRadius = '6px';
-		} else {
-			arg.el.style.background = '';
 		}
 
-		// Heute hervorheben: Rahmen + leicht dunkler
 		const isToday = sameDay(arg.date, new Date());
-		if (isToday) {
-			arg.el.classList.add('bbfc-today');
-		} else {
-			arg.el.classList.remove('bbfc-today');
-		}
+		if (isToday) arg.el.classList.add('bbfc-today');
 
-		// Klickbarkeit + A11y
 		arg.el.style.cursor = 'pointer';
-		arg.el.setAttribute('role', 'button');
-		arg.el.setAttribute('tabindex', '0');
 		arg.el.title = count > 0 ? `${count} Ereignis${count > 1 ? 'se' : ''}` : '';
-
-		// Für globales Styling
-		arg.el.classList.toggle('bbfc-colored', !!bg);
 	};
 
-	// Inhalt der Zelle (Tageszahl oben links, Text mittig)
 	const dayCellContentAgg = (arg) => {
 		const key = arg.date.toISOString().slice(0, 10);
 		const count = countsByDate[key] || 0;
 		const dayNum = arg.dayNumberText || '';
-		const label = count > 0 ? formatDisplay(arg.date, count) : ''; // Template anwenden
+		const label = count > 0 ? formatDisplay(arg.date, count) : '';
 		return {
 			html: `
         <div class="bbfc-wrap">
           <div class="bbfc-daynum">${dayNum}</div>
-          <div class="bbfc-center">
-            ${label ? `<span class="bbfc-label">${label}</span>` : ''}
-          </div>
+          <div class="bbfc-center">${label ? `<span class="bbfc-label">${label}</span>` : ''}</div>
         </div>
       `,
 		};
 	};
 
-	// Events-Ansicht: Klick auf Event
 	const onEventClick = (event) => {
 		const rowId = event?.event?.extendedProps?.event?._id || '';
 		calendarEvent({ value: event.event, rowId });
 	};
 
-	// Aggregat-Ansicht: Klick auf Tag -> Payload für Modal/Drawer
 	const onDateClick = (info) => {
 		const dateStr = info.dateStr;
 		const events = eventsByDate[dateStr] || [];
@@ -269,7 +216,7 @@
 			label: formatDisplay(new Date(dateStr), count),
 			isToday: sameDay(new Date(dateStr), new Date()),
 		};
-		calendarEvent({ value: payload });
+		calendarEvent({ value: payload }); // ← ruft Budibase Actions aus „On Click“ aus
 	};
 
 	let options;
@@ -283,8 +230,6 @@
 		customButtons: makeCustomButtons(),
 
 		events: eventsList,
-
-		// Umschaltbarer Modus
 		eventDisplay: isAggregate() ? 'none' : 'auto',
 		dayCellContent: isAggregate() ? dayCellContentAgg : undefined,
 		dayCellDidMount: isAggregate() ? dayCellDidMountAgg : undefined,
@@ -301,14 +246,12 @@
 </div>
 
 <style>
-	/* Zelle komplett füllen */
 	.bbfc-wrap {
 		position: relative;
 		height: 100%;
 		width: 100%;
 	}
 
-	/* Tageszahl oben links */
 	.bbfc-daynum {
 		position: absolute;
 		top: 0.35rem;
@@ -320,7 +263,6 @@
 		pointer-events: none;
 	}
 
-	/* Mittiger Text */
 	.bbfc-center {
 		position: absolute;
 		inset: 0;
@@ -329,6 +271,7 @@
 		justify-content: center;
 		pointer-events: none;
 	}
+
 	.bbfc-label {
 		font-size: 1.1rem;
 		font-weight: 800;
@@ -338,14 +281,12 @@
 		pointer-events: none;
 	}
 
-	/* Heute: deutlicher Rahmen + leichte Abdunklung */
 	.bbfc-today {
 		outline: 3px solid rgba(0, 0, 0, 0.35);
 		outline-offset: -2px;
 		filter: saturate(1.05) brightness(0.98);
 	}
 
-	/* dezenter Hover für gefärbte Zellen */
 	.bbfc-colored:hover {
 		filter: brightness(0.96);
 	}
