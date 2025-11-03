@@ -5,7 +5,6 @@
 	import daygridPlugin from '@fullcalendar/daygrid';
 	import timeGridPlugin from '@fullcalendar/timegrid';
 	import listPlugin from '@fullcalendar/list';
-	import interactionPlugin from '@fullcalendar/interaction'; // ← NEU, wichtig!
 	import { onMount } from 'svelte';
 	import { langs, codeLang } from './lang';
 
@@ -40,6 +39,9 @@
 	export let viewMode = 'counts';
 
 	// --- Farb-/Schwellen-Logik (Sidebar) ---
+	// Min Farbe: wenn count <= thresholdMin
+	// Neutral Farbe: wenn thresholdMin < count < thresholdMax
+	// Max Farbe: wenn count >= thresholdMax
 	export let thresholdMin = 1;
 	export let thresholdMax = 5;
 
@@ -47,7 +49,8 @@
 	export let colorNeutral = 'rgba(255,235,59,0.35)';
 	export let colorMax = 'rgba(244,67,54,0.35)';
 
-	// Anzeige-Template im Aggregatmodus (Sidebar)
+	// Anzeige-Template im Aggregatmodus (Sidebar):
+	// Platzhalter: {count}, {date}, {iso}, {weekday}
 	export let displayTemplate = '{count}';
 
 	// --- Interner State ---
@@ -117,6 +120,22 @@
 	$: JSON.stringify({
 		a: dataProvider?.rows,
 		b: dataProvider2?.rows,
+		m1: {
+			mappingTitle,
+			mappingDate,
+			mappingStart,
+			mappingEnd,
+			allday,
+			mappingColor,
+		},
+		m2: {
+			mappingTitle2,
+			mappingDate2,
+			mappingStart2,
+			mappingEnd2,
+			allday2,
+			mappingColor2,
+		},
 		th: { thresholdMin, thresholdMax },
 		col: { colorMin, colorNeutral, colorMax },
 		dt: displayTemplate,
@@ -126,7 +145,7 @@
 	const isAggregate = () => viewMode === 'counts';
 
 	const baseOptions = {
-		plugins: [daygridPlugin, listPlugin, timeGridPlugin, interactionPlugin], // ← interaction hinzugefügt!
+		plugins: [daygridPlugin, listPlugin, timeGridPlugin], // KEIN interaction nötig
 		initialDate: new Date(),
 		locale: language,
 		dayMaxEvents: true,
@@ -154,7 +173,8 @@
 	const colorForCount = (count) => {
 		if (count >= thresholdMax) return colorMax;
 		if (count <= thresholdMin) return colorMin;
-		return colorNeutral;
+		if (count > thresholdMin && count < thresholdMax) return colorNeutral;
+		return '';
 	};
 
 	const sameDay = (d1, d2) =>
@@ -179,13 +199,13 @@
 			.replaceAll('{date}', dateHuman);
 	};
 
-	// gesamte Zelle einfärben + Today hervorheben + Klickbarkeit
+	// >>> WICHTIG: wir hängen den Klick direkt an die Zelle (kein interactionPlugin nötig)
 	const dayCellDidMountAgg = (arg) => {
 		const key = arg.date.toISOString().slice(0, 10);
 		const count = countsByDate[key] || 0;
 		const bg = colorForCount(count);
 
-		// Hintergrundfarbe
+		// Hintergrund
 		if (bg) {
 			arg.el.style.background = bg;
 			arg.el.style.borderRadius = '6px';
@@ -194,17 +214,40 @@
 		}
 
 		// Heute hervorheben
-		const isToday = sameDay(arg.date, new Date());
-		if (isToday) {
+		if (sameDay(arg.date, new Date())) {
 			arg.el.classList.add('bbfc-today');
 		} else {
 			arg.el.classList.remove('bbfc-today');
 		}
 
-		// Klickbarkeit aktivieren
+		// Klickbarkeit + A11y
 		arg.el.style.cursor = 'pointer';
 		arg.el.setAttribute('role', 'button');
+		arg.el.setAttribute('tabindex', '0');
 		arg.el.title = count > 0 ? `${count} Ereignis${count > 1 ? 'se' : ''}` : '';
+
+		// Direkt-Listener: Maus & Tastatur (Enter/Space)
+		const fire = () => {
+			const events = eventsByDate[key] || [];
+			const payload = {
+				date: key,
+				count: events.length,
+				events,
+				label: formatDisplay(new Date(key), events.length),
+				isToday: sameDay(new Date(key), new Date()),
+			};
+			calendarEvent({ value: payload });
+		};
+		arg.el.addEventListener('click', fire);
+		arg.el.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter' || e.key === ' ') {
+				e.preventDefault();
+				fire();
+			}
+		});
+
+		// Für globales Styling
+		arg.el.classList.toggle('bbfc-colored', !!bg);
 	};
 
 	// Inhalt der Zelle (Tageszahl oben links, Text mittig)
@@ -212,7 +255,7 @@
 		const key = arg.date.toISOString().slice(0, 10);
 		const count = countsByDate[key] || 0;
 		const dayNum = arg.dayNumberText || '';
-		const label = count > 0 ? formatDisplay(arg.date, count) : '';
+		const label = count > 0 ? formatDisplay(arg.date, count) : ''; // Template anwenden
 		return {
 			html: `
         <div class="bbfc-wrap">
@@ -231,20 +274,7 @@
 		calendarEvent({ value: event.event, rowId });
 	};
 
-	// Counts-Ansicht: Klick auf Tag -> feuert Budibase-Action
-	const onDateClick = (info) => {
-		const dateStr = info.dateStr;
-		const events = eventsByDate[dateStr] || [];
-		const count = events.length;
-		const payload = {
-			date: dateStr,
-			count,
-			events,
-			label: formatDisplay(new Date(dateStr), count),
-			isToday: sameDay(new Date(dateStr), new Date()),
-		};
-		calendarEvent({ value: payload }); // → Budibase "On Click"-Aktionen
-	};
+	// Counts-Ansicht nutzt den Direkt-Listener oben; hier bleibt dateClick bewusst aus.
 
 	let options;
 	$: options = {
@@ -262,7 +292,7 @@
 		eventDisplay: isAggregate() ? 'none' : 'auto',
 		dayCellContent: isAggregate() ? dayCellContentAgg : undefined,
 		dayCellDidMount: isAggregate() ? dayCellDidMountAgg : undefined,
-		dateClick: isAggregate() ? onDateClick : undefined,
+		// kein dateClick nötig – wir triggern direkt über dayCellDidMount
 		eventClick: isAggregate() ? undefined : onEventClick,
 	};
 
@@ -275,12 +305,14 @@
 </div>
 
 <style>
+	/* Zelle komplett füllen */
 	.bbfc-wrap {
 		position: relative;
 		height: 100%;
 		width: 100%;
 	}
 
+	/* Tageszahl oben links */
 	.bbfc-daynum {
 		position: absolute;
 		top: 0.35rem;
@@ -292,15 +324,15 @@
 		pointer-events: none;
 	}
 
+	/* Mittiger Text */
 	.bbfc-center {
 		position: absolute;
 		inset: 0;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		pointer-events: none;
+		pointer-events: none; /* Klick fällt auf die Zelle durch */
 	}
-
 	.bbfc-label {
 		font-size: 1.1rem;
 		font-weight: 800;
@@ -309,12 +341,14 @@
 		text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
 	}
 
+	/* Heute: deutlicher Rahmen + leichte Abdunklung */
 	.bbfc-today {
 		outline: 3px solid rgba(0, 0, 0, 0.35);
 		outline-offset: -2px;
 		filter: saturate(1.05) brightness(0.98);
 	}
 
+	/* dezenter Hover für gefärbte Zellen */
 	.bbfc-colored:hover {
 		filter: brightness(0.96);
 	}
