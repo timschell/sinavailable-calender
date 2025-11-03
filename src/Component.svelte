@@ -5,10 +5,11 @@
 	import daygridPlugin from '@fullcalendar/daygrid';
 	import timeGridPlugin from '@fullcalendar/timegrid';
 	import listPlugin from '@fullcalendar/list';
-	import interactionPlugin from '@fullcalendar/interaction'; // ← entscheidend!
+	import interactionPlugin from '@fullcalendar/interaction'; // ← NEU, wichtig!
 	import { onMount } from 'svelte';
 	import { langs, codeLang } from './lang';
 
+	// --- Budibase Inputs ---
 	export let language;
 	export let calendarEvent;
 
@@ -35,8 +36,10 @@
 	export let headerOptionsCenter;
 	export let headerOptionsEnd;
 
+	// Ansicht: "counts" (aggregiert) oder "events" (Einzeltermine)
 	export let viewMode = 'counts';
 
+	// --- Farb-/Schwellen-Logik (Sidebar) ---
 	export let thresholdMin = 1;
 	export let thresholdMax = 5;
 
@@ -44,8 +47,10 @@
 	export let colorNeutral = 'rgba(255,235,59,0.35)';
 	export let colorMax = 'rgba(244,67,54,0.35)';
 
+	// Anzeige-Template im Aggregatmodus (Sidebar)
 	export let displayTemplate = '{count}';
 
+	// --- Interner State ---
 	let eventsList = [];
 	let eventsByDate = {};
 	let countsByDate = {};
@@ -54,7 +59,10 @@
 		if (!val) return null;
 		const d = new Date(val);
 		if (isNaN(d)) return null;
-		return d.toISOString().slice(0, 10);
+		const y = d.getFullYear();
+		const m = String(d.getMonth() + 1).padStart(2, '0');
+		const day = String(d.getDate()).padStart(2, '0');
+		return `${y}-${m}-${day}`;
 	};
 
 	const addEventToBuckets = (ev) => {
@@ -105,6 +113,7 @@
 
 	onMount(buildEvents);
 
+	// Rebuild bei Daten-/Konfig-Änderungen
 	$: JSON.stringify({
 		a: dataProvider?.rows,
 		b: dataProvider2?.rows,
@@ -117,7 +126,7 @@
 	const isAggregate = () => viewMode === 'counts';
 
 	const baseOptions = {
-		plugins: [daygridPlugin, listPlugin, timeGridPlugin, interactionPlugin], // ← hier ist’s drin!
+		plugins: [daygridPlugin, listPlugin, timeGridPlugin, interactionPlugin], // ← interaction hinzugefügt!
 		initialDate: new Date(),
 		locale: language,
 		dayMaxEvents: true,
@@ -129,7 +138,9 @@
 	const makeCustomButtons = () => ({
 		toggleView: {
 			text: isAggregate() ? 'Events' : 'Anzahl',
-			click: () => (viewMode = isAggregate() ? 'events' : 'counts'),
+			click: () => {
+				viewMode = isAggregate() ? 'events' : 'counts';
+			},
 		},
 	});
 
@@ -168,23 +179,35 @@
 			.replaceAll('{date}', dateHuman);
 	};
 
+	// gesamte Zelle einfärben + Today hervorheben + Klickbarkeit
 	const dayCellDidMountAgg = (arg) => {
 		const key = arg.date.toISOString().slice(0, 10);
 		const count = countsByDate[key] || 0;
 		const bg = colorForCount(count);
 
+		// Hintergrundfarbe
 		if (bg) {
 			arg.el.style.background = bg;
 			arg.el.style.borderRadius = '6px';
+		} else {
+			arg.el.style.background = '';
 		}
 
+		// Heute hervorheben
 		const isToday = sameDay(arg.date, new Date());
-		if (isToday) arg.el.classList.add('bbfc-today');
+		if (isToday) {
+			arg.el.classList.add('bbfc-today');
+		} else {
+			arg.el.classList.remove('bbfc-today');
+		}
 
+		// Klickbarkeit aktivieren
 		arg.el.style.cursor = 'pointer';
+		arg.el.setAttribute('role', 'button');
 		arg.el.title = count > 0 ? `${count} Ereignis${count > 1 ? 'se' : ''}` : '';
 	};
 
+	// Inhalt der Zelle (Tageszahl oben links, Text mittig)
 	const dayCellContentAgg = (arg) => {
 		const key = arg.date.toISOString().slice(0, 10);
 		const count = countsByDate[key] || 0;
@@ -194,17 +217,21 @@
 			html: `
         <div class="bbfc-wrap">
           <div class="bbfc-daynum">${dayNum}</div>
-          <div class="bbfc-center">${label ? `<span class="bbfc-label">${label}</span>` : ''}</div>
+          <div class="bbfc-center">
+            ${label ? `<span class="bbfc-label">${label}</span>` : ''}
+          </div>
         </div>
       `,
 		};
 	};
 
+	// Events-Ansicht: Klick auf Event
 	const onEventClick = (event) => {
 		const rowId = event?.event?.extendedProps?.event?._id || '';
 		calendarEvent({ value: event.event, rowId });
 	};
 
+	// Counts-Ansicht: Klick auf Tag -> feuert Budibase-Action
 	const onDateClick = (info) => {
 		const dateStr = info.dateStr;
 		const events = eventsByDate[dateStr] || [];
@@ -216,7 +243,7 @@
 			label: formatDisplay(new Date(dateStr), count),
 			isToday: sameDay(new Date(dateStr), new Date()),
 		};
-		calendarEvent({ value: payload }); // ← ruft Budibase Actions aus „On Click“ aus
+		calendarEvent({ value: payload }); // → Budibase "On Click"-Aktionen
 	};
 
 	let options;
@@ -230,6 +257,8 @@
 		customButtons: makeCustomButtons(),
 
 		events: eventsList,
+
+		// Umschaltbarer Modus
 		eventDisplay: isAggregate() ? 'none' : 'auto',
 		dayCellContent: isAggregate() ? dayCellContentAgg : undefined,
 		dayCellDidMount: isAggregate() ? dayCellDidMountAgg : undefined,
@@ -278,7 +307,6 @@
 		line-height: 1;
 		color: #0f172a;
 		text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
-		pointer-events: none;
 	}
 
 	.bbfc-today {
