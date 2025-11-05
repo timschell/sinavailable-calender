@@ -46,9 +46,7 @@
 	export let colorNeutral = 'rgba(255,235,59,0.35)';
 	export let colorMax = 'rgba(244,67,54,0.35)';
 
-	// Anzeige-Templates:
-	// Falls displayTemplate gesetzt ist, hat es Vorrang (Legacy).
-	// Platzhalter: {count}, {date}, {iso}, {weekday}
+	// Anzeige-Templates
 	export let displayTemplate = ''; // optional – überschreibt Singular/Plural wenn gesetzt
 	export let displayTemplateSingular = 'Es ist {count} SINA-Gerät verfügbar';
 	export let displayTemplatePlural = 'Es sind {count} SINA-Geräte verfügbar';
@@ -177,13 +175,14 @@
 		return '';
 	};
 
-	const sameDay = (d1, d2) =>
-		d1.getFullYear() === d2.getFullYear() &&
-		d1.getMonth() === d2.getMonth() &&
-		d1.getDate() === d2.getDate();
+	// robuster "Heute"-Vergleich in LOKALZEIT (kein ISO/UTC-Geraffel)
+	const startOfLocalDay = (d) =>
+		new Date(d.getFullYear(), d.getMonth(), d.getDate());
+	const isTodayLocal = (d) =>
+		startOfLocalDay(d).getTime() === startOfLocalDay(new Date()).getTime();
 
 	const formatDisplay = (dateObj, count) => {
-		const iso = dateObj.toISOString().slice(0, 10);
+		const iso = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
 		const weekday = dateObj.toLocaleDateString(language || 'de', {
 			weekday: 'short',
 		});
@@ -193,7 +192,6 @@
 			year: 'numeric',
 		});
 
-		// Template-Auswahl: Legacy (ein Template) hat Vorrang. Sonst Singular/Plural.
 		let template =
 			displayTemplate && displayTemplate.trim().length > 0
 				? displayTemplate
@@ -210,7 +208,7 @@
 
 	// Klick direkt an die Zelle hängen (ohne interactionPlugin)
 	const dayCellDidMountAgg = (arg) => {
-		const key = arg.date.toISOString().slice(0, 10);
+		const key = `${arg.date.getFullYear()}-${String(arg.date.getMonth() + 1).padStart(2, '0')}-${String(arg.date.getDate()).padStart(2, '0')}`;
 		const count = countsByDate[key] || 0;
 		const bg = colorForCount(count);
 
@@ -222,11 +220,14 @@
 			arg.el.style.background = '';
 		}
 
-		// Heute hervorheben
-		if (sameDay(arg.date, new Date())) {
+		// Heute hervorheben (sichtbar, unabhängig vom Theme)
+		if (isTodayLocal(arg.date)) {
 			arg.el.classList.add('bbfc-today');
+			// zusätzlich sichtbarer Inset-Ring
+			arg.el.style.boxShadow = 'inset 0 0 0 3px rgba(0,0,0,0.45)';
 		} else {
 			arg.el.classList.remove('bbfc-today');
+			arg.el.style.boxShadow = '';
 		}
 
 		// Klickbarkeit + A11y
@@ -235,7 +236,6 @@
 		arg.el.setAttribute('tabindex', '0');
 		arg.el.title = count > 0 ? formatDisplay(arg.date, count) : '';
 
-		// Direkt-Listener: Maus & Tastatur (Enter/Space)
 		const fire = () => {
 			const events = eventsByDate[key] || [];
 			const payload = {
@@ -243,7 +243,7 @@
 				count: events.length,
 				events,
 				label: formatDisplay(new Date(key), events.length),
-				isToday: sameDay(new Date(key), new Date()),
+				isToday: isTodayLocal(new Date(key)),
 			};
 			calendarEvent({ value: payload });
 		};
@@ -255,20 +255,22 @@
 			}
 		});
 
-		// Für globales Styling
 		arg.el.classList.toggle('bbfc-colored', !!bg);
 	};
 
-	// Inhalt der Zelle (Tageszahl oben links, Text mittig)
+	// Inhalt der Zelle (Tageszahl + Satz + "Heute"-Badge)
 	const dayCellContentAgg = (arg) => {
-		const key = arg.date.toISOString().slice(0, 10);
+		const key = `${arg.date.getFullYear()}-${String(arg.date.getMonth() + 1).padStart(2, '0')}-${String(arg.date.getDate()).padStart(2, '0')}`;
 		const count = countsByDate[key] || 0;
 		const dayNum = arg.dayNumberText || '';
-		const label = count > 0 ? formatDisplay(arg.date, count) : ''; // Satz statt Zahl
+		const label = count > 0 ? formatDisplay(arg.date, count) : '';
+		const todayBadge = isTodayLocal(arg.date)
+			? '<span class="bbfc-badge">Heute</span>'
+			: '';
 		return {
 			html: `
         <div class="bbfc-wrap">
-          <div class="bbfc-daynum">${dayNum}</div>
+          <div class="bbfc-daynum">${dayNum}${todayBadge}</div>
           <div class="bbfc-center">
             ${label ? `<span class="bbfc-label">${label}</span>` : ''}
           </div>
@@ -292,7 +294,6 @@
 			end: ensureEndToolbar(),
 		},
 		customButtons: makeCustomButtons(),
-
 		events: eventsList,
 
 		// Umschaltbarer Modus
@@ -311,14 +312,12 @@
 </div>
 
 <style>
-	/* Zelle komplett füllen */
 	.bbfc-wrap {
 		position: relative;
 		height: 100%;
 		width: 100%;
 	}
 
-	/* Tageszahl oben links */
 	.bbfc-daynum {
 		position: absolute;
 		top: 0.35rem;
@@ -329,15 +328,24 @@
 		opacity: 0.9;
 		pointer-events: none;
 	}
+	.bbfc-badge {
+		margin-left: 0.35rem;
+		padding: 0.05rem 0.35rem;
+		border-radius: 0.4rem;
+		font-size: 0.7rem;
+		font-weight: 700;
+		color: #0f172a;
+		background: rgba(255, 255, 255, 0.8);
+		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08) inset;
+	}
 
-	/* Mittiger Text */
 	.bbfc-center {
 		position: absolute;
 		inset: 0;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		pointer-events: none; /* Klick fällt auf die Zelle durch */
+		pointer-events: none;
 	}
 	.bbfc-label {
 		font-size: 1.05rem;
@@ -349,14 +357,12 @@
 		padding: 0 0.35rem;
 	}
 
-	/* Heute: deutlicher Rahmen + leichte Abdunklung */
+	/* Fallback-Highlight-Klasse (zusätzlich zur Inset-Boxshadow im Code) */
 	.bbfc-today {
 		outline: 3px solid rgba(0, 0, 0, 0.35);
 		outline-offset: -2px;
-		filter: saturate(1.05) brightness(0.98);
 	}
 
-	/* dezenter Hover für gefärbte Zellen */
 	.bbfc-colored:hover {
 		filter: brightness(0.96);
 	}
