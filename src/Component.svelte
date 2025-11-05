@@ -8,12 +8,12 @@
 	import { onMount } from 'svelte';
 	import { langs, codeLang } from './lang';
 
-	// --- Budibase Inputs ---
+	// Budibase Inputs
 	export let language;
 	export let calendarEvent;
 
 	export let mappingTitle;
-	export let mappingDate;
+	export let mappingDate; // z.B. "date" = "5.11.2025"
 	export let mappingStart;
 	export let mappingEnd;
 
@@ -35,31 +35,79 @@
 	export let headerOptionsCenter;
 	export let headerOptionsEnd;
 
-	// Ansicht: "counts" (aggregiert) oder "events" (Einzeltermine)
+	// Ansicht: counts / events
 	export let viewMode = 'counts';
 
-	// --- Farb-/Schwellen-Logik (Sidebar) ---
+	// Schwellen & Farben (Hinweis: Max greift bei >= thresholdMax)
 	export let thresholdMin = 1;
-	export let thresholdMax = 5;
+	export let thresholdMax = 6;
 
-	export let colorMin = 'rgba(76,175,80,0.25)';
-	export let colorNeutral = 'rgba(255,235,59,0.35)';
-	export let colorMax = 'rgba(244,67,54,0.35)';
+	// Wenn du „viel = grün“ willst, setz colorMax grün:
+	export let colorMin = 'rgba(244,67,54,0.35)'; // wenig/<=Min -> rot
+	export let colorNeutral = 'rgba(255,235,59,0.35)'; // dazwischen -> gelb
+	export let colorMax = 'rgba(76,175,80,0.35)'; // viel/>=Max -> grün
 
-	// Anzeige-Templates
-	export let displayTemplate = ''; // optional – überschreibt Singular/Plural wenn gesetzt
+	// Anzeige-Text
+	export let displayTemplate = ''; // optional override
 	export let displayTemplateSingular = 'Es ist {count} SINA-Gerät verfügbar';
 	export let displayTemplatePlural = 'Es sind {count} SINA-Geräte verfügbar';
 
-	// --- Interner State ---
+	// Optionaler Filter: nur Zeilen zählen, wenn Feld == Wert (z. B. status == "frei")
+	export let filterField = 'status';
+	export let filterEquals = 'frei';
+
+	// State
 	let eventsList = [];
 	let eventsByDate = {};
 	let countsByDate = {};
 
-	const toISODate = (val) => {
+	// ---- robustes Datums-Parsing ----
+	const parseToDate = (val) => {
 		if (!val) return null;
-		const d = new Date(val);
-		if (isNaN(d)) return null;
+
+		if (val instanceof Date) {
+			return isNaN(val) ? null : val;
+		}
+
+		if (typeof val === 'number') {
+			const d = new Date(val);
+			return isNaN(d) ? null : d;
+		}
+
+		if (typeof val === 'string') {
+			const s = val.trim();
+
+			// DD.MM.YYYY
+			const m1 = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+			if (m1) {
+				const dd = parseInt(m1[1], 10);
+				const mm = parseInt(m1[2], 10);
+				const yyyy = parseInt(m1[3], 10);
+				const d = new Date(yyyy, mm - 1, dd);
+				return isNaN(d) ? null : d;
+			}
+
+			// YYYY-MM-DD
+			const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+			if (m2) {
+				const yyyy = parseInt(m2[1], 10);
+				const mm = parseInt(m2[2], 10);
+				const dd = parseInt(m2[3], 10);
+				const d = new Date(yyyy, mm - 1, dd);
+				return isNaN(d) ? null : d;
+			}
+
+			// Fallback: native Parser
+			const d = new Date(s);
+			return isNaN(d) ? null : d;
+		}
+
+		return null;
+	};
+
+	const toISODate = (val) => {
+		const d = parseToDate(val);
+		if (!d) return null;
 		const y = d.getFullYear();
 		const m = String(d.getMonth() + 1).padStart(2, '0');
 		const day = String(d.getDate()).padStart(2, '0');
@@ -74,6 +122,12 @@
 		countsByDate[key] = (countsByDate[key] || 0) + 1;
 	};
 
+	const includeRow = (row) => {
+		if (!filterField || filterEquals === undefined || filterEquals === null)
+			return true;
+		return row?.[filterField] === filterEquals;
+	};
+
 	const buildEvents = () => {
 		eventsList = [];
 		eventsByDate = {};
@@ -81,6 +135,7 @@
 
 		if (dataProvider?.rows) {
 			dataProvider.rows.forEach((row) => {
+				if (!includeRow(row)) return;
 				const ev = {
 					title: row?.[mappingTitle],
 					date: row?.[mappingDate],
@@ -97,6 +152,7 @@
 
 		if (dataProvider2?.rows) {
 			dataProvider2.rows.forEach((row) => {
+				if (!includeRow(row)) return;
 				const ev = {
 					title: row?.[mappingTitle2],
 					date: row?.[mappingDate2],
@@ -114,29 +170,24 @@
 
 	onMount(buildEvents);
 
-	// Rebuild bei Daten-/Konfig-Änderungen
+	// Rebuild bei Änderungen
 	$: JSON.stringify({
 		a: dataProvider?.rows,
 		b: dataProvider2?.rows,
-		m1: {
+		maps: {
 			mappingTitle,
 			mappingDate,
 			mappingStart,
 			mappingEnd,
-			allday,
-			mappingColor,
-		},
-		m2: {
 			mappingTitle2,
 			mappingDate2,
 			mappingStart2,
 			mappingEnd2,
-			allday2,
-			mappingColor2,
 		},
+		dayFilter: { filterField, filterEquals },
 		th: { thresholdMin, thresholdMax },
 		col: { colorMin, colorNeutral, colorMax },
-		dt: { displayTemplate, displayTemplateSingular, displayTemplatePlural },
+		txt: { displayTemplate, displayTemplateSingular, displayTemplatePlural },
 	}),
 		buildEvents();
 
@@ -171,11 +222,9 @@
 	const colorForCount = (count) => {
 		if (count >= thresholdMax) return colorMax;
 		if (count <= thresholdMin) return colorMin;
-		if (count > thresholdMin && count < thresholdMax) return colorNeutral;
-		return '';
+		return colorNeutral;
 	};
 
-	// robuster "Heute"-Vergleich in LOKALZEIT
 	const startOfLocalDay = (d) =>
 		new Date(d.getFullYear(), d.getMonth(), d.getDate());
 	const isTodayLocal = (d) =>
@@ -191,14 +240,12 @@
 			month: '2-digit',
 			year: 'numeric',
 		});
-
 		let template =
 			displayTemplate && displayTemplate.trim().length > 0
 				? displayTemplate
 				: count === 1
 					? displayTemplateSingular
 					: displayTemplatePlural;
-
 		return template
 			.replaceAll('{count}', String(count))
 			.replaceAll('{iso}', iso)
@@ -206,21 +253,15 @@
 			.replaceAll('{date}', dateHuman);
 	};
 
-	// Klick direkt an die Zelle hängen (ohne interactionPlugin)
+	// Counts-Modus: Zelle einfärben & klickbar
 	const dayCellDidMountAgg = (arg) => {
 		const key = `${arg.date.getFullYear()}-${String(arg.date.getMonth() + 1).padStart(2, '0')}-${String(arg.date.getDate()).padStart(2, '0')}`;
 		const count = countsByDate[key] || 0;
 		const bg = colorForCount(count);
 
-		// Hintergrund
-		if (bg) {
-			arg.el.style.background = bg;
-			arg.el.style.borderRadius = '6px';
-		} else {
-			arg.el.style.background = '';
-		}
+		arg.el.style.background = bg || '';
+		arg.el.style.borderRadius = '6px';
 
-		// Heute hervorheben
 		if (isTodayLocal(arg.date)) {
 			arg.el.classList.add('bbfc-today');
 			arg.el.style.boxShadow = 'inset 0 0 0 3px rgba(0,0,0,0.45)';
@@ -229,7 +270,6 @@
 			arg.el.style.boxShadow = '';
 		}
 
-		// Klickbarkeit + A11y
 		arg.el.style.cursor = 'pointer';
 		arg.el.setAttribute('role', 'button');
 		arg.el.setAttribute('tabindex', '0');
@@ -244,7 +284,6 @@
 				label: formatDisplay(new Date(key), events.length),
 				isToday: isTodayLocal(new Date(key)),
 			};
-			// >>> WICHTIG: zusätzlich clickedDate mitgeben
 			calendarEvent({ value: payload, clickedDate: key });
 		};
 		arg.el.addEventListener('click', fire);
@@ -254,11 +293,8 @@
 				fire();
 			}
 		});
-
-		arg.el.classList.toggle('bbfc-colored', !!bg);
 	};
 
-	// Inhalt der Zelle (Tageszahl + Satz)
 	const dayCellContentAgg = (arg) => {
 		const key = `${arg.date.getFullYear()}-${String(arg.date.getMonth() + 1).padStart(2, '0')}-${String(arg.date.getDate()).padStart(2, '0')}`;
 		const count = countsByDate[key] || 0;
@@ -266,20 +302,22 @@
 		const label = count > 0 ? formatDisplay(arg.date, count) : '';
 		return {
 			html: `
-        <div class="bbfc-wrap">
-          <div class="bbfc-daynum">${dayNum}</div>
-          <div class="bbfc-center">
-            ${label ? `<span class="bbfc-label">${label}</span>` : ''}
-          </div>
-        </div>
-      `,
+      <div class="bbfc-wrap">
+        <div class="bbfc-daynum">${dayNum}</div>
+        <div class="bbfc-center">${label ? `<span class="bbfc-label">${label}</span>` : ''}</div>
+      </div>
+    `,
 		};
 	};
 
-	// Events-Ansicht: Klick auf Event
-	const onEventClick = (event) => {
-		const rowId = event?.event?.extendedProps?.event?._id || '';
-		calendarEvent({ value: event.event, rowId });
+	// Event-Ansicht
+	const onEventClick = (ev) => {
+		const start = ev?.event?.start;
+		const clickedDate = start
+			? `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`
+			: '';
+		const rowId = ev?.event?.extendedProps?.event?._id || '';
+		calendarEvent({ value: ev.event, rowId, clickedDate });
 	};
 
 	let options;
@@ -292,8 +330,6 @@
 		},
 		customButtons: makeCustomButtons(),
 		events: eventsList,
-
-		// Umschaltbarer Modus
 		eventDisplay: isAggregate() ? 'none' : 'auto',
 		dayCellContent: isAggregate() ? dayCellContentAgg : undefined,
 		dayCellDidMount: isAggregate() ? dayCellDidMountAgg : undefined,
@@ -314,7 +350,6 @@
 		height: 100%;
 		width: 100%;
 	}
-
 	.bbfc-daynum {
 		position: absolute;
 		top: 0.35rem;
@@ -325,7 +360,6 @@
 		opacity: 0.9;
 		pointer-events: none;
 	}
-
 	.bbfc-center {
 		position: absolute;
 		inset: 0;
@@ -343,14 +377,8 @@
 		text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
 		padding: 0 0.35rem;
 	}
-
-	/* Heute-Rahmen */
 	.bbfc-today {
 		outline: 3px solid rgba(0, 0, 0, 0.35);
 		outline-offset: -2px;
-	}
-
-	.bbfc-colored:hover {
-		filter: brightness(0.96);
 	}
 </style>
