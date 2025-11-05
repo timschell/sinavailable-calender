@@ -89,7 +89,7 @@
             "type": "color",
             "label": "Color Mapping",
             "key": "mappingColor2",
-            "defaultValue": "#000000"
+            "defaultValue": "#000"
           }
         ]
       },
@@ -119,75 +119,14 @@
       },
       {
         "section": true,
-        "name": "Counts / Heatmap",
-        "settings": [
-          {
-            "type": "number",
-            "key": "thresholdMin",
-            "label": "Schwelle MIN (<=)",
-            "defaultValue": 1
-          },
-          {
-            "type": "number",
-            "key": "thresholdMax",
-            "label": "Schwelle MAX (>=)",
-            "defaultValue": 5
-          },
-          {
-            "type": "color",
-            "key": "colorMin",
-            "label": "Min Farbe (<= MIN)",
-            "defaultValue": "rgba(76,175,80,0.25)"
-          },
-          {
-            "type": "color",
-            "key": "colorNeutral",
-            "label": "Neutral Farbe (zwischen MIN/MAX)",
-            "defaultValue": "rgba(255,235,59,0.35)"
-          },
-          {
-            "type": "color",
-            "key": "colorMax",
-            "label": "Max Farbe (>= MAX)",
-            "defaultValue": "rgba(244,67,54,0.35)"
-          }
-        ]
-      },
-      {
-        "section": true,
-        "name": "Anzeige-Text",
-        "settings": [
-          {
-            "type": "text",
-            "key": "displayTemplate",
-            "label": "Optionales Override-Template",
-            "helperText": "Platzhalter: {count}, {date}, {iso}, {weekday}. Wenn gesetzt, überschreibt es Singular/Plural.",
-            "defaultValue": ""
-          },
-          {
-            "type": "text",
-            "key": "displayTemplateSingular",
-            "label": "Singular-Template",
-            "helperText": "Beispiel: Es ist {count} SINA-Gerät verfügbar",
-            "defaultValue": "Es ist {count} SINA-Gerät verfügbar"
-          },
-          {
-            "type": "text",
-            "key": "displayTemplatePlural",
-            "label": "Plural-Template",
-            "helperText": "Beispiel: Es sind {count} SINA-Geräte verfügbar",
-            "defaultValue": "Es sind {count} SINA-Geräte verfügbar"
-          }
-        ]
-      },
-      {
-        "section": true,
-        "name": "Allgemein",
         "settings": [
           {
             "type": "select",
             "key": "language",
-            "options": ["de", "en"],
+            "options": [
+              "de",
+              "en"
+            ],
             "label": "language",
             "defaultValue": "de"
           },
@@ -202,7 +141,58 @@
             ]
           }
         ]
+      },
+      {
+        "type": "select",
+        "key": "viewMode",
+        "label": "View mode",
+        "options": [
+          { "label": "Counts per day", "value": "counts" },
+          { "label": "Events",        "value": "events" }
+        ],
+        "defaultValue": "counts"
+      },
+      {
+        "section": true,
+        "name": "Event-Farbsteuerung",
+        "settings": [
+          {
+            "type": "number",
+            "key": "thresholdMin",
+            "label": "Min-Wert",
+            "defaultValue": 1,
+            "helperText": "Wenn die Anzahl der Events kleiner oder gleich diesem Wert ist, wird die Min-Farbe angezeigt."
+          },
+          {
+            "type": "number",
+            "key": "thresholdMax",
+            "label": "Max-Wert",
+            "defaultValue": 5,
+            "helperText": "Wenn die Anzahl der Events größer oder gleich diesem Wert ist, wird die Max-Farbe angezeigt."
+          },
+          {
+            "type": "color",
+            "key": "colorMin",
+            "label": "Min Farbe",
+            "defaultValue": "rgba(76,175,80,0.25)",
+            "helperText": "Farbe für Tage mit niedriger Auslastung (<= Min-Wert)."
+          },
+          {
+            "type": "color",
+            "key": "colorNeutral",
+            "label": "Neutral Farbe",
+            "defaultValue": "rgba(255,235,59,0.35)",
+            "helperText": "Farbe für Tage mit mittlerer Auslastung (zwischen Min- und Max-Wert)."
+          },
+          {
+            "type": "color",
+            "key": "colorMax",
+            "label": "Max Farbe",
+            "defaultValue": "rgba(244,67,54,0.35)",
+            "helperText": "Farbe für Tage mit hoher Auslastung (>= Max-Wert)."
+          }
+        ]
       }
     ]
   }
-}
+} 
