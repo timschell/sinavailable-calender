@@ -39,9 +39,6 @@
 	export let viewMode = 'counts';
 
 	// --- Farb-/Schwellen-Logik (Sidebar) ---
-	// Min Farbe: wenn count <= thresholdMin
-	// Neutral Farbe: wenn thresholdMin < count < thresholdMax
-	// Max Farbe: wenn count >= thresholdMax
 	export let thresholdMin = 1;
 	export let thresholdMax = 5;
 
@@ -49,9 +46,12 @@
 	export let colorNeutral = 'rgba(255,235,59,0.35)';
 	export let colorMax = 'rgba(244,67,54,0.35)';
 
-	// Anzeige-Template im Aggregatmodus (Sidebar):
+	// Anzeige-Templates:
+	// Falls displayTemplate gesetzt ist, hat es Vorrang (Legacy).
 	// Platzhalter: {count}, {date}, {iso}, {weekday}
-	export let displayTemplate = '{count}';
+	export let displayTemplate = ''; // optional – überschreibt Singular/Plural wenn gesetzt
+	export let displayTemplateSingular = 'Es ist {count} SINA-Gerät verfügbar';
+	export let displayTemplatePlural = 'Es sind {count} SINA-Geräte verfügbar';
 
 	// --- Interner State ---
 	let eventsList = [];
@@ -138,14 +138,14 @@
 		},
 		th: { thresholdMin, thresholdMax },
 		col: { colorMin, colorNeutral, colorMax },
-		dt: displayTemplate,
+		dt: { displayTemplate, displayTemplateSingular, displayTemplatePlural },
 	}),
 		buildEvents();
 
 	const isAggregate = () => viewMode === 'counts';
 
 	const baseOptions = {
-		plugins: [daygridPlugin, listPlugin, timeGridPlugin], // KEIN interaction nötig
+		plugins: [daygridPlugin, listPlugin, timeGridPlugin],
 		initialDate: new Date(),
 		locale: language,
 		dayMaxEvents: true,
@@ -192,14 +192,23 @@
 			month: '2-digit',
 			year: 'numeric',
 		});
-		return (displayTemplate || '{count}')
+
+		// Template-Auswahl: Legacy (ein Template) hat Vorrang. Sonst Singular/Plural.
+		let template =
+			displayTemplate && displayTemplate.trim().length > 0
+				? displayTemplate
+				: count === 1
+					? displayTemplateSingular
+					: displayTemplatePlural;
+
+		return template
 			.replaceAll('{count}', String(count))
 			.replaceAll('{iso}', iso)
 			.replaceAll('{weekday}', weekday)
 			.replaceAll('{date}', dateHuman);
 	};
 
-	// >>> WICHTIG: wir hängen den Klick direkt an die Zelle (kein interactionPlugin nötig)
+	// Klick direkt an die Zelle hängen (ohne interactionPlugin)
 	const dayCellDidMountAgg = (arg) => {
 		const key = arg.date.toISOString().slice(0, 10);
 		const count = countsByDate[key] || 0;
@@ -224,7 +233,7 @@
 		arg.el.style.cursor = 'pointer';
 		arg.el.setAttribute('role', 'button');
 		arg.el.setAttribute('tabindex', '0');
-		arg.el.title = count > 0 ? `${count} Ereignis${count > 1 ? 'se' : ''}` : '';
+		arg.el.title = count > 0 ? formatDisplay(arg.date, count) : '';
 
 		// Direkt-Listener: Maus & Tastatur (Enter/Space)
 		const fire = () => {
@@ -255,7 +264,7 @@
 		const key = arg.date.toISOString().slice(0, 10);
 		const count = countsByDate[key] || 0;
 		const dayNum = arg.dayNumberText || '';
-		const label = count > 0 ? formatDisplay(arg.date, count) : ''; // Template anwenden
+		const label = count > 0 ? formatDisplay(arg.date, count) : ''; // Satz statt Zahl
 		return {
 			html: `
         <div class="bbfc-wrap">
@@ -274,8 +283,6 @@
 		calendarEvent({ value: event.event, rowId });
 	};
 
-	// Counts-Ansicht nutzt den Direkt-Listener oben; hier bleibt dateClick bewusst aus.
-
 	let options;
 	$: options = {
 		...baseOptions,
@@ -292,7 +299,6 @@
 		eventDisplay: isAggregate() ? 'none' : 'auto',
 		dayCellContent: isAggregate() ? dayCellContentAgg : undefined,
 		dayCellDidMount: isAggregate() ? dayCellDidMountAgg : undefined,
-		// kein dateClick nötig – wir triggern direkt über dayCellDidMount
 		eventClick: isAggregate() ? undefined : onEventClick,
 	};
 
@@ -334,11 +340,13 @@
 		pointer-events: none; /* Klick fällt auf die Zelle durch */
 	}
 	.bbfc-label {
-		font-size: 1.1rem;
-		font-weight: 800;
-		line-height: 1;
+		font-size: 1.05rem;
+		font-weight: 700;
+		line-height: 1.15;
 		color: #0f172a;
+		text-align: center;
 		text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
+		padding: 0 0.35rem;
 	}
 
 	/* Heute: deutlicher Rahmen + leichte Abdunklung */
