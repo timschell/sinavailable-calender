@@ -135,11 +135,13 @@
             "label": "On Click",
             "key": "calendarEvent",
             "context": [
-              { "label": "clickedEvent",        "key": "value"   },
-              { "label": "clickedEventId",      "key": "rowId"   },
-              { "label": "clickedEventTableId", "key": "tableId" }
+              { "label": "clickedEvent",        "key": "value"       },
+              { "label": "clickedEventId",      "key": "rowId"       },
+              { "label": "clickedEventTableId", "key": "tableId"     },
+              { "label": "clickedDate",         "key": "clickedDate" },
+              { "label": "clickedCount",        "key": "count"       }
             ]
-          }
+}
         ]
       },
       {
