@@ -1,6 +1,6 @@
 {
   "name": "budibase-fullcalendar",
-  "version": "1.2.6",
+  "version": "1.2.7",
   "description": "simple calendar component for budibase",
   "license": "timschell",
   "svelte": "index.js",

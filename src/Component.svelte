@@ -175,7 +175,7 @@
 		return '';
 	};
 
-	// robuster "Heute"-Vergleich in LOKALZEIT (kein ISO/UTC-Geraffel)
+	// robuster "Heute"-Vergleich in LOKALZEIT
 	const startOfLocalDay = (d) =>
 		new Date(d.getFullYear(), d.getMonth(), d.getDate());
 	const isTodayLocal = (d) =>
@@ -223,7 +223,6 @@
 		// Heute hervorheben (sichtbar, unabhängig vom Theme)
 		if (isTodayLocal(arg.date)) {
 			arg.el.classList.add('bbfc-today');
-			// zusätzlich sichtbarer Inset-Ring
 			arg.el.style.boxShadow = 'inset 0 0 0 3px rgba(0,0,0,0.45)';
 		} else {
 			arg.el.classList.remove('bbfc-today');
@@ -258,19 +257,16 @@
 		arg.el.classList.toggle('bbfc-colored', !!bg);
 	};
 
-	// Inhalt der Zelle (Tageszahl + Satz + "Heute"-Badge)
+	// Inhalt der Zelle (Tageszahl + Satz) – KEIN „Heute“-Badge mehr
 	const dayCellContentAgg = (arg) => {
 		const key = `${arg.date.getFullYear()}-${String(arg.date.getMonth() + 1).padStart(2, '0')}-${String(arg.date.getDate()).padStart(2, '0')}`;
 		const count = countsByDate[key] || 0;
 		const dayNum = arg.dayNumberText || '';
 		const label = count > 0 ? formatDisplay(arg.date, count) : '';
-		const todayBadge = isTodayLocal(arg.date)
-			? '<span class="bbfc-badge">Heute</span>'
-			: '';
 		return {
 			html: `
         <div class="bbfc-wrap">
-          <div class="bbfc-daynum">${dayNum}${todayBadge}</div>
+          <div class="bbfc-daynum">${dayNum}</div>
           <div class="bbfc-center">
             ${label ? `<span class="bbfc-label">${label}</span>` : ''}
           </div>
@@ -328,16 +324,6 @@
 		opacity: 0.9;
 		pointer-events: none;
 	}
-	.bbfc-badge {
-		margin-left: 0.35rem;
-		padding: 0.05rem 0.35rem;
-		border-radius: 0.4rem;
-		font-size: 0.7rem;
-		font-weight: 700;
-		color: #0f172a;
-		background: rgba(255, 255, 255, 0.8);
-		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08) inset;
-	}
 
 	.bbfc-center {
 		position: absolute;
@@ -357,7 +343,7 @@
 		padding: 0 0.35rem;
 	}
 
-	/* Fallback-Highlight-Klasse (zusätzlich zur Inset-Boxshadow im Code) */
+	/* Heute-Rahmen */
 	.bbfc-today {
 		outline: 3px solid rgba(0, 0, 0, 0.35);
 		outline-offset: -2px;
