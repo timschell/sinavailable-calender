@@ -8,12 +8,12 @@
 	import { onMount } from 'svelte';
 	import { langs, codeLang } from './lang';
 
-	// Budibase Inputs
+	// Eingaben aus Budibase
 	export let language;
 	export let calendarEvent;
 
 	export let mappingTitle;
-	export let mappingDate; // z.B. "date" = "5.11.2025"
+	export let mappingDate; // Datumsfeld (z. B. "date" mit "5.11.2025" oder "2025-11-05")
 	export let mappingStart;
 	export let mappingEnd;
 
@@ -35,39 +35,34 @@
 	export let headerOptionsCenter;
 	export let headerOptionsEnd;
 
-	// Ansicht: counts / events
+	// Ansicht umschalten (counts / events)
 	export let viewMode = 'counts';
 
-	// Schwellen & Farben (Hinweis: Max greift bei >= thresholdMax)
+	// Schwellen & Farben (viel = grün, wenig = rot)
 	export let thresholdMin = 1;
 	export let thresholdMax = 6;
-
-	// Wenn du „viel = grün“ willst, setz colorMax grün:
-	export let colorMin = 'rgba(244,67,54,0.35)'; // wenig/<=Min -> rot
-	export let colorNeutral = 'rgba(255,235,59,0.35)'; // dazwischen -> gelb
-	export let colorMax = 'rgba(76,175,80,0.35)'; // viel/>=Max -> grün
+	export let colorMin = 'rgba(244,67,54,0.35)'; // <= Min
+	export let colorNeutral = 'rgba(255,235,59,0.35)'; // zwischen Min/Max
+	export let colorMax = 'rgba(76,175,80,0.35)'; // >= Max
 
 	// Anzeige-Text
 	export let displayTemplate = ''; // optional override
 	export let displayTemplateSingular = 'Es ist {count} SINA-Gerät verfügbar';
 	export let displayTemplatePlural = 'Es sind {count} SINA-Geräte verfügbar';
 
-	// Optionaler Filter: nur Zeilen zählen, wenn Feld == Wert (z. B. status == "frei")
-	export let filterField = 'status';
-	export let filterEquals = 'frei';
+	// Debug in die Konsole
+	export let debug = false;
 
 	// State
 	let eventsList = [];
 	let eventsByDate = {};
 	let countsByDate = {};
 
-	// ---- robustes Datums-Parsing ----
+	// Robustes Datums-Parsing (DD.MM.YYYY [HH:MM[:SS]], YYYY-MM-DD, ISO, Timestamp)
 	const parseToDate = (val) => {
 		if (!val) return null;
 
-		if (val instanceof Date) {
-			return isNaN(val) ? null : val;
-		}
+		if (val instanceof Date) return isNaN(val) ? null : val;
 
 		if (typeof val === 'number') {
 			const d = new Date(val);
@@ -77,27 +72,42 @@
 		if (typeof val === 'string') {
 			const s = val.trim();
 
+			// DD.MM.YYYY HH:MM[:SS]
+			const dmYhm = s.match(
+				/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
+			);
+			if (dmYhm) {
+				const dd = parseInt(dmYhm[1], 10);
+				const mm = parseInt(dmYhm[2], 10);
+				const yyyy = parseInt(dmYhm[3], 10);
+				const HH = dmYhm[4] ? parseInt(dmYhm[4], 10) : 0;
+				const MI = dmYhm[5] ? parseInt(dmYhm[5], 10) : 0;
+				const SS = dmYhm[6] ? parseInt(dmYhm[6], 10) : 0;
+				const d = new Date(yyyy, mm - 1, dd, HH, MI, SS);
+				return isNaN(d) ? null : d;
+			}
+
 			// DD.MM.YYYY
-			const m1 = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-			if (m1) {
-				const dd = parseInt(m1[1], 10);
-				const mm = parseInt(m1[2], 10);
-				const yyyy = parseInt(m1[3], 10);
+			const dmY = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+			if (dmY) {
+				const dd = parseInt(dmY[1], 10);
+				const mm = parseInt(dmY[2], 10);
+				const yyyy = parseInt(dmY[3], 10);
 				const d = new Date(yyyy, mm - 1, dd);
 				return isNaN(d) ? null : d;
 			}
 
 			// YYYY-MM-DD
-			const m2 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-			if (m2) {
-				const yyyy = parseInt(m2[1], 10);
-				const mm = parseInt(m2[2], 10);
-				const dd = parseInt(m2[3], 10);
+			const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+			if (iso) {
+				const yyyy = parseInt(iso[1], 10);
+				const mm = parseInt(iso[2], 10);
+				const dd = parseInt(iso[3], 10);
 				const d = new Date(yyyy, mm - 1, dd);
 				return isNaN(d) ? null : d;
 			}
 
-			// Fallback: native Parser
+			// Fallback
 			const d = new Date(s);
 			return isNaN(d) ? null : d;
 		}
@@ -122,59 +132,69 @@
 		countsByDate[key] = (countsByDate[key] || 0) + 1;
 	};
 
-	const includeRow = (row) => {
-		if (!filterField || filterEquals === undefined || filterEquals === null)
-			return true;
-		return row?.[filterField] === filterEquals;
-	};
-
 	const buildEvents = () => {
 		eventsList = [];
 		eventsByDate = {};
 		countsByDate = {};
 
-		if (dataProvider?.rows) {
-			dataProvider.rows.forEach((row) => {
-				if (!includeRow(row)) return;
-				const ev = {
-					title: row?.[mappingTitle],
-					date: row?.[mappingDate],
-					start: row?.[mappingStart],
-					end: row?.[mappingEnd],
-					color: mappingColor ?? '#313131',
-					event: row,
-					allDay: allday,
-				};
-				eventsList.push(ev);
-				addEventToBuckets(ev);
-			});
-		}
+		const rejected = [];
 
-		if (dataProvider2?.rows) {
-			dataProvider2.rows.forEach((row) => {
-				if (!includeRow(row)) return;
+		const pushRows = (rows, map) => {
+			if (!rows) return;
+			rows.forEach((row) => {
+				const rawDate = row?.[map.date];
+				const isoKey = toISODate(rawDate);
+				if (!isoKey) {
+					rejected.push({ rawDate, row });
+					return;
+				}
+
 				const ev = {
-					title: row?.[mappingTitle2],
-					date: row?.[mappingDate2],
-					start: row?.[mappingStart2],
-					end: row?.[mappingEnd2],
-					color: mappingColor2 ?? '#eb4034',
+					title: row?.[map.title],
+					date: row?.[map.date],
+					start: row?.[map.start],
+					end: row?.[map.end],
+					color: map.color ?? '#313131',
 					event: row,
-					allDay: allday2,
+					allDay: map.allday,
 				};
 				eventsList.push(ev);
 				addEventToBuckets(ev);
 			});
+		};
+
+		pushRows(dataProvider?.rows, {
+			title: mappingTitle,
+			date: mappingDate,
+			start: mappingStart,
+			end: mappingEnd,
+			color: mappingColor,
+			allday,
+		});
+		pushRows(dataProvider2?.rows, {
+			title: mappingTitle2,
+			date: mappingDate2,
+			start: mappingStart2,
+			end: mappingEnd2,
+			color: mappingColor2,
+			allday: allday2,
+		});
+
+		if (debug) {
+			console.group('[Calendar Debug]');
+			console.log('countsByDate', countsByDate);
+			if (rejected.length)
+				console.warn('Rejected (date parse failed):', rejected.slice(0, 10));
+			console.groupEnd();
 		}
 	};
 
 	onMount(buildEvents);
 
-	// Rebuild bei Änderungen
 	$: JSON.stringify({
 		a: dataProvider?.rows,
 		b: dataProvider2?.rows,
-		maps: {
+		m: {
 			mappingTitle,
 			mappingDate,
 			mappingStart,
@@ -184,9 +204,8 @@
 			mappingStart2,
 			mappingEnd2,
 		},
-		dayFilter: { filterField, filterEquals },
-		th: { thresholdMin, thresholdMax },
-		col: { colorMin, colorNeutral, colorMax },
+		t: { thresholdMin, thresholdMax },
+		c: { colorMin, colorNeutral, colorMax },
 		txt: { displayTemplate, displayTemplateSingular, displayTemplatePlural },
 	}),
 		buildEvents();
@@ -241,7 +260,7 @@
 			year: 'numeric',
 		});
 		let template =
-			displayTemplate && displayTemplate.trim().length > 0
+			displayTemplate && displayTemplate.trim()
 				? displayTemplate
 				: count === 1
 					? displayTemplateSingular
@@ -255,8 +274,11 @@
 
 	// Counts-Modus: Zelle einfärben & klickbar
 	const dayCellDidMountAgg = (arg) => {
-		const key = `${arg.date.getFullYear()}-${String(arg.date.getMonth() + 1).padStart(2, '0')}-${String(arg.date.getDate()).padStart(2, '0')}`;
-		const count = countsByDate[key] || 0;
+		const key = `${arg.date.getFullYear()}-${String(arg.date.getMonth() + 1).padStart(2, '0')}-${String(arg.date).padStart ? '' : ''}${String(arg.date.getDate()).padStart(2, '0')}`;
+		// obiges war Mist – sauber:
+		const keyClean = `${arg.date.getFullYear()}-${String(arg.date.getMonth() + 1).padStart(2, '0')}-${String(arg.date.getDate()).padStart(2, '0')}`;
+
+		const count = countsByDate[keyClean] || 0;
 		const bg = colorForCount(count);
 
 		arg.el.style.background = bg || '';
@@ -276,15 +298,15 @@
 		arg.el.title = count > 0 ? formatDisplay(arg.date, count) : '';
 
 		const fire = () => {
-			const events = eventsByDate[key] || [];
+			const events = eventsByDate[keyClean] || [];
 			const payload = {
-				date: key,
+				date: keyClean,
 				count: events.length,
 				events,
-				label: formatDisplay(new Date(key), events.length),
-				isToday: isTodayLocal(new Date(key)),
+				label: formatDisplay(new Date(keyClean), events.length),
+				isToday: isTodayLocal(new Date(keyClean)),
 			};
-			calendarEvent({ value: payload, clickedDate: key });
+			calendarEvent({ value: payload, clickedDate: keyClean });
 		};
 		arg.el.addEventListener('click', fire);
 		arg.el.addEventListener('keydown', (e) => {
