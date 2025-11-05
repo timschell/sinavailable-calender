@@ -220,7 +220,7 @@
 			arg.el.style.background = '';
 		}
 
-		// Heute hervorheben (sichtbar, unabhängig vom Theme)
+		// Heute hervorheben
 		if (isTodayLocal(arg.date)) {
 			arg.el.classList.add('bbfc-today');
 			arg.el.style.boxShadow = 'inset 0 0 0 3px rgba(0,0,0,0.45)';
@@ -244,7 +244,8 @@
 				label: formatDisplay(new Date(key), events.length),
 				isToday: isTodayLocal(new Date(key)),
 			};
-			calendarEvent({ value: payload });
+			// >>> WICHTIG: zusätzlich clickedDate mitgeben
+			calendarEvent({ value: payload, clickedDate: key });
 		};
 		arg.el.addEventListener('click', fire);
 		arg.el.addEventListener('keydown', (e) => {
@@ -257,7 +258,7 @@
 		arg.el.classList.toggle('bbfc-colored', !!bg);
 	};
 
-	// Inhalt der Zelle (Tageszahl + Satz) – KEIN „Heute“-Badge mehr
+	// Inhalt der Zelle (Tageszahl + Satz)
 	const dayCellContentAgg = (arg) => {
 		const key = `${arg.date.getFullYear()}-${String(arg.date.getMonth() + 1).padStart(2, '0')}-${String(arg.date.getDate()).padStart(2, '0')}`;
 		const count = countsByDate[key] || 0;
