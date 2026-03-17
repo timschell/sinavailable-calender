@@ -1,6 +1,8 @@
 {
   "type": "component",
-  "metadata": {},
+  "metadata": {
+    "svelteMajor": 5
+  },
   "schema": {
     "name": "budibase-fullcalendar",
     "friendlyName": "FullCalendar",
@@ -11,110 +13,35 @@
         "section": true,
         "name": "Event Group 1",
         "settings": [
-          {
-            "type": "dataProvider",
-            "label": "DataProvider",
-            "key": "dataProvider",
-            "required": true
-          },
-          {
-            "type": "text",
-            "key": "mappingTitle",
-            "label": "Title Mapping"
-          },
-          {
-            "type": "text",
-            "key": "mappingDate",
-            "label": "Date Mapping"
-          },
-          {
-            "type": "text",
-            "key": "mappingStart",
-            "label": "Start Mapping"
-          },
-          {
-            "type": "text",
-            "key": "mappingEnd",
-            "label": "End Mapping"
-          },
-          {
-            "type": "boolean",
-            "key": "allday",
-            "label": "AllDay Mapping"
-          },
-          {
-            "type": "color",
-            "label": "Color Mapping",
-            "key": "mappingColor",
-            "defaultValue": "#272727"
-          }
+          { "type": "dataProvider", "label": "DataProvider", "key": "dataProvider", "required": true },
+          { "type": "text", "key": "mappingTitle", "label": "Title Mapping" },
+          { "type": "text", "key": "mappingDate", "label": "Date Mapping" },
+          { "type": "text", "key": "mappingStart", "label": "Start Mapping" },
+          { "type": "text", "key": "mappingEnd", "label": "End Mapping" },
+          { "type": "boolean", "key": "allday", "label": "AllDay Mapping" },
+          { "type": "color", "label": "Color Mapping", "key": "mappingColor", "defaultValue": "#272727" }
         ]
       },
       {
         "section": true,
         "name": "Event Group 2",
         "settings": [
-          {
-            "type": "dataProvider",
-            "label": "DataProvider",
-            "key": "dataProvider2",
-            "required": false
-          },
-          {
-            "type": "text",
-            "key": "mappingTitle2",
-            "label": "Title Mapping"
-          },
-          {
-            "type": "text",
-            "key": "mappingDate2",
-            "label": "Date Mapping"
-          },
-          {
-            "type": "text",
-            "key": "mappingStart2",
-            "label": "Start Mapping"
-          },
-          {
-            "type": "text",
-            "key": "mappingEnd2",
-            "label": "End Mapping"
-          },
-          {
-            "type": "boolean",
-            "key": "allday2",
-            "label": "AllDay Mapping"
-          },
-          {
-            "type": "color",
-            "label": "Color Mapping",
-            "key": "mappingColor2",
-            "defaultValue": "#000"
-          }
+          { "type": "dataProvider", "label": "DataProvider", "key": "dataProvider2", "required": false },
+          { "type": "text", "key": "mappingTitle2", "label": "Title Mapping" },
+          { "type": "text", "key": "mappingDate2", "label": "Date Mapping" },
+          { "type": "text", "key": "mappingStart2", "label": "Start Mapping" },
+          { "type": "text", "key": "mappingEnd2", "label": "End Mapping" },
+          { "type": "boolean", "key": "allday2", "label": "AllDay Mapping" },
+          { "type": "color", "label": "Color Mapping", "key": "mappingColor2", "defaultValue": "#000" }
         ]
       },
       {
         "section": true,
         "name": "Header options",
         "settings": [
-          {
-            "type": "text",
-            "label": "Start Options",
-            "key": "headerOptionsStart",
-            "defaultValue": "prev,next today"
-          },
-          {
-            "type": "text",
-            "label": "Center Options",
-            "key": "headerOptionsCenter",
-            "defaultValue": "title"
-          },
-          {
-            "type": "text",
-            "label": "End Options",
-            "key": "headerOptionsEnd",
-            "defaultValue": "dayGridMonth,dayGridWeek,timeGridDay"
-          }
+          { "type": "text", "label": "Start Options", "key": "headerOptionsStart", "defaultValue": "prev,next today" },
+          { "type": "text", "label": "Center Options", "key": "headerOptionsCenter", "defaultValue": "title" },
+          { "type": "text", "label": "End Options", "key": "headerOptionsEnd", "defaultValue": "dayGridMonth,dayGridWeek,timeGridDay" }
         ]
       },
       {
@@ -123,10 +50,7 @@
           {
             "type": "select",
             "key": "language",
-            "options": [
-              "de",
-              "en"
-            ],
+            "options": ["de", "en"],
             "label": "language",
             "defaultValue": "de"
           },
@@ -135,13 +59,13 @@
             "label": "On Click",
             "key": "calendarEvent",
             "context": [
-              { "label": "clickedEvent",        "key": "value"       },
-              { "label": "clickedEventId",      "key": "rowId"       },
-              { "label": "clickedEventTableId", "key": "tableId"     },
-              { "label": "clickedDate",         "key": "clickedDate" },
-              { "label": "clickedCount",        "key": "count"       }
+              { "label": "clickedEvent", "key": "value" },
+              { "label": "clickedEventId", "key": "rowId" },
+              { "label": "clickedEventTableId", "key": "tableId" },
+              { "label": "clickedDate", "key": "clickedDate" },
+              { "label": "clickedCount", "key": "count" }
             ]
-}
+          }
         ]
       },
       {
@@ -150,7 +74,7 @@
         "label": "View mode",
         "options": [
           { "label": "Counts per day", "value": "counts" },
-          { "label": "Events",        "value": "events" }
+          { "label": "Events", "value": "events" }
         ],
         "defaultValue": "counts"
       },
@@ -158,43 +82,13 @@
         "section": true,
         "name": "Event-Farbsteuerung",
         "settings": [
-          {
-            "type": "number",
-            "key": "thresholdMin",
-            "label": "Min-Wert",
-            "defaultValue": 1,
-            "helperText": "Wenn die Anzahl der Events kleiner oder gleich diesem Wert ist, wird die Min-Farbe angezeigt."
-          },
-          {
-            "type": "number",
-            "key": "thresholdMax",
-            "label": "Max-Wert",
-            "defaultValue": 5,
-            "helperText": "Wenn die Anzahl der Events größer oder gleich diesem Wert ist, wird die Max-Farbe angezeigt."
-          },
-          {
-            "type": "color",
-            "key": "colorMin",
-            "label": "Min Farbe",
-            "defaultValue": "rgba(76,175,80,0.25)",
-            "helperText": "Farbe für Tage mit niedriger Auslastung (<= Min-Wert)."
-          },
-          {
-            "type": "color",
-            "key": "colorNeutral",
-            "label": "Neutral Farbe",
-            "defaultValue": "rgba(255,235,59,0.35)",
-            "helperText": "Farbe für Tage mit mittlerer Auslastung (zwischen Min- und Max-Wert)."
-          },
-          {
-            "type": "color",
-            "key": "colorMax",
-            "label": "Max Farbe",
-            "defaultValue": "rgba(244,67,54,0.35)",
-            "helperText": "Farbe für Tage mit hoher Auslastung (>= Max-Wert)."
-          }
+          { "type": "number", "key": "thresholdMin", "label": "Min-Wert", "defaultValue": 1, "helperText": "Wenn die Anzahl der Events kleiner oder gleich diesem Wert ist, wird die Min-Farbe angezeigt." },
+          { "type": "number", "key": "thresholdMax", "label": "Max-Wert", "defaultValue": 5, "helperText": "Wenn die Anzahl der Events größer oder gleich diesem Wert ist, wird die Max-Farbe angezeigt." },
+          { "type": "color", "key": "colorMin", "label": "Min Farbe", "defaultValue": "rgba(76,175,80,0.25)", "helperText": "Farbe für Tage mit niedriger Auslastung (<= Min-Wert)." },
+          { "type": "color", "key": "colorNeutral", "label": "Neutral Farbe", "defaultValue": "rgba(255,235,59,0.35)", "helperText": "Farbe für Tage mit mittlerer Auslastung (zwischen Min- und Max-Wert)." },
+          { "type": "color", "key": "colorMax", "label": "Max Farbe", "defaultValue": "rgba(244,67,54,0.35)", "helperText": "Farbe für Tage mit hoher Auslastung (>= Max-Wert)." }
         ]
       }
     ]
   }
-} 
+}

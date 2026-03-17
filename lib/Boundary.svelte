@@ -1,4 +1,3 @@
-
 <script>
     import pkg from "../package.json"
     import { getContext } from "svelte"

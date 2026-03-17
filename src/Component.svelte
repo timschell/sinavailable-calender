@@ -1,391 +1,215 @@
 <script>
-	import { getContext } from 'svelte';
+	import { getContext, onMount, onDestroy } from 'svelte';
+	import { Calendar } from '@fullcalendar/core';
 	import '@fullcalendar/core/locales-all';
-	import FullCalendar from 'svelte-fullcalendar';
-	import daygridPlugin from '@fullcalendar/daygrid';
+	import dayGridPlugin from '@fullcalendar/daygrid';
 	import timeGridPlugin from '@fullcalendar/timegrid';
 	import listPlugin from '@fullcalendar/list';
-	import { onMount } from 'svelte';
+	import interactionPlugin from '@fullcalendar/interaction';
 	import { langs, codeLang } from './lang';
 
-	// Inputs
 	export let language;
 	export let calendarEvent;
-
 	export let mappingTitle;
-	export let mappingDate; // -> DIES ist das Zähldatum
+	export let mappingDate;
 	export let mappingStart;
 	export let mappingEnd;
-
 	export let mappingTitle2;
 	export let mappingDate2;
 	export let mappingStart2;
 	export let mappingEnd2;
-
 	export let dataProvider;
 	export let dataProvider2;
-
 	export let mappingColor;
 	export let mappingColor2;
-
 	export let allday;
 	export let allday2;
-
 	export let headerOptionsStart;
 	export let headerOptionsCenter;
 	export let headerOptionsEnd;
-
 	export let viewMode = 'counts';
-
-	// Schwellen & Farben
 	export let thresholdMin = 1;
 	export let thresholdMax = 6;
-	export let colorMin = 'rgba(244,67,54,0.35)'; // <= Min
-	export let colorNeutral = 'rgba(255,235,59,0.35)'; // zwischen
-	export let colorMax = 'rgba(76,175,80,0.35)'; // >= Max
-
-	// Texte
+	export let colorMin = 'rgba(244,67,54,0.35)';
+	export let colorNeutral = 'rgba(255,235,59,0.35)';
+	export let colorMax = 'rgba(76,175,80,0.35)';
 	export let displayTemplate = '';
 	export let displayTemplateSingular = 'Es ist {count} SINA-Gerät verfügbar';
 	export let displayTemplatePlural = 'Es sind {count} SINA-Geräte verfügbar';
-
-	// Debug
 	export let debug = false;
 
-	// State
-	let eventsList = [];
-	let eventsByDate = {};
-	let countsByDate = {};
+	let calendarEl;
+	let calendar = null;
+	let timer = null;
+	// byDate und counts als Closure-Variablen damit dateClick drauf zugreifen kann
+	let _byDate = {};
+	let _counts = {};
 
-	// robustes Datums-Parsing
 	const parseToDate = (val) => {
 		if (!val) return null;
 		if (val instanceof Date) return isNaN(val) ? null : val;
-		if (typeof val === 'number') {
-			const d = new Date(val);
-			return isNaN(d) ? null : d;
-		}
+		if (typeof val === 'number') { const d = new Date(val); return isNaN(d)?null:d; }
 		if (typeof val === 'string') {
 			const s = val.trim();
-
-			// DD.MM.YYYY HH:MM[:SS]
-			const dmYhm = s.match(
-				/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
-			);
-			if (dmYhm) {
-				const dd = +dmYhm[1],
-					mm = +dmYhm[2],
-					yyyy = +dmYhm[3];
-				const HH = dmYhm[4] ? +dmYhm[4] : 0;
-				const MI = dmYhm[5] ? +dmYhm[5] : 0;
-				const SS = dmYhm[6] ? +dmYhm[6] : 0;
-				const d = new Date(yyyy, mm - 1, dd, HH, MI, SS);
-				return isNaN(d) ? null : d;
-			}
-
-			// DD.MM.YYYY
-			const dmY = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-			if (dmY) {
-				const dd = +dmY[1],
-					mm = +dmY[2],
-					yyyy = +dmY[3];
-				const d = new Date(yyyy, mm - 1, dd);
-				return isNaN(d) ? null : d;
-			}
-
-			// YYYY-MM-DD
-			const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-			if (iso) {
-				const yyyy = +iso[1],
-					mm = +iso[2],
-					dd = +iso[3];
-				const d = new Date(yyyy, mm - 1, dd);
-				return isNaN(d) ? null : d;
-			}
-
-			const d = new Date(s);
-			return isNaN(d) ? null : d;
+			const m1 = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+			if (m1) { const d=new Date(+m1[3],+m1[2]-1,+m1[1],m1[4]?+m1[4]:0,m1[5]?+m1[5]:0,m1[6]?+m1[6]:0); return isNaN(d)?null:d; }
+			const m2 = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+			if (m2) { const d=new Date(+m2[3],+m2[2]-1,+m2[1]); return isNaN(d)?null:d; }
+			const m3 = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+			if (m3) { const d=new Date(+m3[1],+m3[2]-1,+m3[3]); return isNaN(d)?null:d; }
+			const d=new Date(s); return isNaN(d)?null:d;
 		}
 		return null;
 	};
 
-	const toISODate = (val) => {
+	const toISO = (val) => {
 		const d = parseToDate(val);
 		if (!d) return null;
-		const y = d.getFullYear();
-		const m = String(d.getMonth() + 1).padStart(2, '0');
-		const day = String(d.getDate()).padStart(2, '0');
-		return `${y}-${m}-${day}`;
+		return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 	};
 
-	// *** Wichtig: immer nach ev.date bucketen (fallback: ev.start) ***
-	const bucketKeyFromEvent = (ev) => {
-		return toISODate(ev.date) || toISODate(ev.start) || null;
+	const dayKey = (d) =>
+		`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+	function buildData() {
+		const list=[],byDate={},counts={};
+		const add=(ev)=>{
+			const k=toISO(ev.date)||toISO(ev.start); if(!k)return;
+			if(!byDate[k])byDate[k]=[];
+			byDate[k].push(ev); counts[k]=(counts[k]||0)+1;
+		};
+		const push=(rows,map)=>{
+			if(!rows)return;
+			rows.forEach(row=>{
+				const ev={title:row?.[map.title],date:row?.[map.date],start:row?.[map.start],end:row?.[map.end],color:map.color??'#313131',event:row,allDay:map.allday};
+				list.push(ev); add(ev);
+			});
+		};
+		push(dataProvider?.rows,{title:mappingTitle,date:mappingDate,start:mappingStart,end:mappingEnd,color:mappingColor,allday});
+		push(dataProvider2?.rows,{title:mappingTitle2,date:mappingDate2,start:mappingStart2,end:mappingEnd2,color:mappingColor2,allday:allday2});
+		if(debug) console.log('[Calendar 1.9.0] counts:',counts);
+		_byDate = byDate;
+		_counts = counts;
+		return {list,byDate,counts};
+	}
+
+	const isAgg=()=>viewMode==='counts';
+	const colorFor=(c)=>c>=thresholdMax?colorMax:c<=thresholdMin?colorMin:colorNeutral;
+	const sod=(d)=>new Date(d.getFullYear(),d.getMonth(),d.getDate());
+	const isToday=(d)=>sod(d).getTime()===sod(new Date()).getTime();
+	const fmtDisplay=(dt,count)=>{
+		const iso=dayKey(dt);
+		const wd=dt.toLocaleDateString(language||'de',{weekday:'short'});
+		const dh=dt.toLocaleDateString(language||'de',{day:'2-digit',month:'2-digit',year:'numeric'});
+		const tpl=displayTemplate?.trim()?displayTemplate:count===1?displayTemplateSingular:displayTemplatePlural;
+		return tpl.replaceAll('{count}',String(count)).replaceAll('{iso}',iso).replaceAll('{weekday}',wd).replaceAll('{date}',dh);
 	};
 
-	const addEventToBuckets = (ev) => {
-		const key = bucketKeyFromEvent(ev); // <- fix
-		if (!key) return;
-		if (!eventsByDate[key]) eventsByDate[key] = [];
-		eventsByDate[key].push(ev);
-		countsByDate[key] = (countsByDate[key] || 0) + 1;
-	};
+	function initCalendar() {
+		if (!calendarEl) return;
+		if (calendar) { try { calendar.destroy(); } catch(e){} calendar=null; }
 
-	const buildEvents = () => {
-		eventsList = [];
-		eventsByDate = {};
-		countsByDate = {};
+		const {list,byDate,counts} = buildData();
 
-		const pushRows = (rows, map) => {
-			if (!rows) return;
-			rows.forEach((row) => {
-				const ev = {
-					title: row?.[map.title],
-					date: row?.[map.date], // <- Primärdatum
-					start: row?.[map.start], // optional
-					end: row?.[map.end], // optional
-					color: map.color ?? '#313131',
-					event: row,
-					allDay: map.allday,
-				};
-				eventsList.push(ev);
-				addEventToBuckets(ev);
+		const cellMount=(arg)=>{
+			const k=dayKey(arg.date),c=counts[k]||0;
+			arg.el.style.background=colorFor(c);
+			arg.el.style.borderRadius='6px';
+			if(isToday(arg.date)){arg.el.classList.add('bbfc-today');arg.el.style.boxShadow='inset 0 0 0 3px rgba(0,0,0,0.45)';}
+			else{arg.el.classList.remove('bbfc-today');arg.el.style.boxShadow='';}
+			arg.el.style.cursor='pointer';
+			arg.el.title=c>0?fmtDisplay(arg.date,c):'';
+		};
+
+		const cellContent=(arg)=>{
+			const k=dayKey(arg.date),c=counts[k]||0;
+			const label=c>0?fmtDisplay(arg.date,c):'';
+			return{html:`<div class="bbfc-wrap"><div class="bbfc-daynum">${arg.dayNumberText||''}</div><div class="bbfc-center">${label?`<span class="bbfc-label">${label}</span>`:''}</div></div>`};
+		};
+
+		// dateClick: FullCalendar's nativer Handler – zuverlässig, kein DOM-Event-Konflikt
+		const onDateClick=(info)=>{
+			if(!isAgg()) return;
+			const k=info.dateStr; // YYYY-MM-DD
+			const evs=_byDate[k]||[];
+			const c=evs.length;
+			if(debug) console.log('[Calendar 1.9.0] dateClick', k, c, evs);
+			calendarEvent?.({
+				value:{date:k,count:c,events:evs,label:fmtDisplay(new Date(k),c),isToday:isToday(new Date(k))},
+				clickedDate:k
 			});
 		};
 
-		pushRows(dataProvider?.rows, {
-			title: mappingTitle,
-			date: mappingDate,
-			start: mappingStart,
-			end: mappingEnd,
-			color: mappingColor,
-			allday,
-		});
-		pushRows(dataProvider2?.rows, {
-			title: mappingTitle2,
-			date: mappingDate2,
-			start: mappingStart2,
-			end: mappingEnd2,
-			color: mappingColor2,
-			allday: allday2,
-		});
+		const endBar=(()=>{const e=(headerOptionsEnd??'').trim();return e?`${e},toggleView`:'dayGridMonth,dayGridWeek,timeGridDay,toggleView';})();
 
-		if (debug) {
-			console.group('[Calendar Debug]');
-			console.log('countsByDate', countsByDate);
-			console.groupEnd();
+		try {
+			calendar = new Calendar(calendarEl, {
+				plugins:[dayGridPlugin,listPlugin,timeGridPlugin,interactionPlugin],
+				initialDate:new Date(),
+				locale:language,
+				dayMaxEvents:true,
+				firstDay:1,
+				height:'auto',
+				...langs[codeLang(language)],
+				headerToolbar:{start:headerOptionsStart,center:headerOptionsCenter,end:endBar},
+				customButtons:{
+					toggleView:{
+						text:isAgg()?'Events':'Anzahl',
+						click:()=>{viewMode=isAgg()?'events':'counts';schedule();},
+					},
+				},
+				events:list,
+				eventDisplay:isAgg()?'none':'auto',
+				dayCellContent:isAgg()?cellContent:undefined,
+				dayCellDidMount:isAgg()?cellMount:undefined,
+				// dateClick statt manueller addEventListener – von FullCalendar korrekt verarbeitet
+				dateClick:onDateClick,
+				eventClick:isAgg()?undefined:(ev)=>{
+					const s=ev?.event?.start;
+					calendarEvent?.({value:ev.event,rowId:ev?.event?.extendedProps?.event?._id||'',clickedDate:s?dayKey(s):''});
+				},
+			});
+			calendar.render();
+			console.log('[Calendar 1.9.0] OK');
+		} catch(err) {
+			console.error('[Calendar 1.9.0] Error:',err);
+			calendar=null;
 		}
-	};
+	}
 
-	onMount(buildEvents);
-	$: JSON.stringify({
-		a: dataProvider?.rows,
-		b: dataProvider2?.rows,
-		maps: {
-			mappingTitle,
-			mappingDate,
-			mappingStart,
-			mappingEnd,
-			mappingTitle2,
-			mappingDate2,
-			mappingStart2,
-			mappingEnd2,
-		},
-		t: { thresholdMin, thresholdMax },
-		c: { colorMin, colorNeutral, colorMax },
-		txt: { displayTemplate, displayTemplateSingular, displayTemplatePlural },
-	}),
-		buildEvents();
+	function schedule() {
+		if(timer) clearTimeout(timer);
+		timer=setTimeout(initCalendar,50);
+	}
 
-	const isAggregate = () => viewMode === 'counts';
+	onMount(()=>{ timer=setTimeout(initCalendar,0); });
 
-	const baseOptions = {
-		plugins: [daygridPlugin, listPlugin, timeGridPlugin],
-		initialDate: new Date(),
-		locale: language,
-		dayMaxEvents: true,
-		firstDay: 1,
-		theme: true,
-		...langs[codeLang(language)],
-	};
-
-	const makeCustomButtons = () => ({
-		toggleView: {
-			text: isAggregate() ? 'Events' : 'Anzahl',
-			click: () => {
-				viewMode = isAggregate() ? 'events' : 'counts';
-			},
-		},
+	onDestroy(()=>{
+		if(timer) clearTimeout(timer);
+		if(calendar){try{calendar.destroy();}catch(e){}}
 	});
 
-	const ensureEndToolbar = () => {
-		const end = (headerOptionsEnd ?? '').trim();
-		return end.length > 0
-			? `${end},toggleView`
-			: 'dayGridMonth,dayGridWeek,timeGridDay,toggleView';
-	};
+	$: JSON.stringify({
+		a:dataProvider?.rows, b:dataProvider2?.rows,
+		maps:{mappingTitle,mappingDate,mappingStart,mappingEnd,mappingTitle2,mappingDate2,mappingStart2,mappingEnd2},
+		t:{thresholdMin,thresholdMax}, c:{colorMin,colorNeutral,colorMax},
+		vm:viewMode, lang:language,
+	}), calendar && schedule();
 
-	const colorForCount = (count) => {
-		if (count >= thresholdMax) return colorMax;
-		if (count <= thresholdMin) return colorMin;
-		return colorNeutral;
-	};
-
-	const startOfLocalDay = (d) =>
-		new Date(d.getFullYear(), d.getMonth(), d.getDate());
-	const isTodayLocal = (d) =>
-		startOfLocalDay(d).getTime() === startOfLocalDay(new Date()).getTime();
-
-	const formatDisplay = (dateObj, count) => {
-		const iso = `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-		const weekday = dateObj.toLocaleDateString(language || 'de', {
-			weekday: 'short',
-		});
-		const dateHuman = dateObj.toLocaleDateString(language || 'de', {
-			day: '2-digit',
-			month: '2-digit',
-			year: 'numeric',
-		});
-		const tpl =
-			displayTemplate && displayTemplate.trim()
-				? displayTemplate
-				: count === 1
-					? displayTemplateSingular
-					: displayTemplatePlural;
-		return tpl
-			.replaceAll('{count}', String(count))
-			.replaceAll('{iso}', iso)
-			.replaceAll('{weekday}', weekday)
-			.replaceAll('{date}', dateHuman);
-	};
-
-	// Counts-Modus: Zelle einfärben & klickbar
-	const dayKey = (d) =>
-		`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-	const dayCellDidMountAgg = (arg) => {
-		const key = dayKey(arg.date);
-		const count = countsByDate[key] || 0;
-		const bg = colorForCount(count);
-
-		arg.el.style.background = bg || '';
-		arg.el.style.borderRadius = '6px';
-
-		if (isTodayLocal(arg.date)) {
-			arg.el.classList.add('bbfc-today');
-			arg.el.style.boxShadow = 'inset 0 0 0 3px rgba(0,0,0,0.45)';
-		} else {
-			arg.el.classList.remove('bbfc-today');
-			arg.el.style.boxShadow = '';
-		}
-
-		arg.el.style.cursor = 'pointer';
-		arg.el.setAttribute('role', 'button');
-		arg.el.setAttribute('tabindex', '0');
-		arg.el.title = count > 0 ? formatDisplay(arg.date, count) : '';
-
-		const fire = () => {
-			const events = eventsByDate[key] || [];
-			const payload = {
-				date: key,
-				count: events.length,
-				events,
-				label: formatDisplay(new Date(key), events.length),
-				isToday: isTodayLocal(new Date(key)),
-			};
-			calendarEvent({ value: payload, clickedDate: key });
-		};
-		arg.el.addEventListener('click', fire);
-		arg.el.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter' || e.key === ' ') {
-				e.preventDefault();
-				fire();
-			}
-		});
-	};
-
-	const dayCellContentAgg = (arg) => {
-		const key = dayKey(arg.date);
-		const count = countsByDate[key] || 0;
-		const dayNum = arg.dayNumberText || '';
-		const label = count > 0 ? formatDisplay(arg.date, count) : '';
-		return {
-			html: `
-      <div class="bbfc-wrap">
-        <div class="bbfc-daynum">${dayNum}</div>
-        <div class="bbfc-center">${label ? `<span class="bbfc-label">${label}</span>` : ''}</div>
-      </div>
-    `,
-		};
-	};
-
-	// Event-Ansicht
-	const onEventClick = (ev) => {
-		const start = ev?.event?.start;
-		const clickedDate = start ? dayKey(start) : '';
-		const rowId = ev?.event?.extendedProps?.event?._id || '';
-		calendarEvent({ value: ev.event, rowId, clickedDate });
-	};
-
-	let options;
-	$: options = {
-		...baseOptions,
-		headerToolbar: {
-			start: headerOptionsStart,
-			center: headerOptionsCenter,
-			end: ensureEndToolbar(),
-		},
-		customButtons: makeCustomButtons(),
-		events: eventsList,
-		eventDisplay: isAggregate() ? 'none' : 'auto',
-		dayCellContent: isAggregate() ? dayCellContentAgg : undefined,
-		dayCellDidMount: isAggregate() ? dayCellDidMountAgg : undefined,
-		eventClick: isAggregate() ? undefined : onEventClick,
-	};
-
-	const { styleable } = getContext('sdk');
-	const component = getContext('component');
+	const {styleable}=getContext('sdk');
+	const component=getContext('component');
 </script>
 
-<div use:styleable={$component.styles}>
-	<FullCalendar {options} />
+<div use:styleable={$component.styles} class="bbfc-container">
+	<div bind:this={calendarEl} class="bbfc-inner"></div>
 </div>
 
 <style>
-	.bbfc-wrap {
-		position: relative;
-		height: 100%;
-		width: 100%;
-	}
-	.bbfc-daynum {
-		position: absolute;
-		top: 0.35rem;
-		left: 0.5rem;
-		font-weight: 600;
-		font-size: 0.9rem;
-		color: #1a1a1a;
-		opacity: 0.9;
-		pointer-events: none;
-	}
-	.bbfc-center {
-		position: absolute;
-		inset: 0;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		pointer-events: none;
-	}
-	.bbfc-label {
-		font-size: 1.05rem;
-		font-weight: 700;
-		line-height: 1.15;
-		color: #0f172a;
-		text-align: center;
-		text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25);
-		padding: 0 0.35rem;
-	}
-	.bbfc-today {
-		outline: 3px solid rgba(0, 0, 0, 0.35);
-		outline-offset: -2px;
-	}
+	.bbfc-container{min-height:500px;width:100%;display:block;}
+	.bbfc-inner{width:100%;min-height:500px;}
+	:global(.bbfc-wrap){position:relative;height:100%;width:100%;}
+	:global(.bbfc-daynum){position:absolute;top:0.35rem;left:0.5rem;font-weight:600;font-size:0.9rem;color:#1a1a1a;opacity:0.9;pointer-events:none;}
+	:global(.bbfc-center){position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;}
+	:global(.bbfc-label){font-size:1.05rem;font-weight:700;line-height:1.15;color:#0f172a;text-align:center;text-shadow:0 1px 0 rgba(255,255,255,0.25);padding:0 0.35rem;}
+	:global(.bbfc-today){outline:3px solid rgba(0,0,0,0.35);outline-offset:-2px;}
 </style>
