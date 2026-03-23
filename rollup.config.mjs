@@ -55,18 +55,28 @@ const bundle = () => ({
   },
 })
 
+// Banner läuft VOR der IIFE im globalen Scope –
+// deshalb sind __bbfc_svelte und __bbfc_si als globale Vars verfügbar
+// wenn die IIFE-Parameter aufgelöst werden.
+//
+// Budibase 3.16: window.svelte_internal = Svelte 4 ✓
+// Budibase 3.24: window.svelteLegacyInternal = Svelte 4 (Legacy),
+//                window.svelte_internal = Svelte 5 (nicht kompatibel)
+const compatBanner = `var __bbfc_svelte=(typeof svelteLegacy!=="undefined"?svelteLegacy:svelte);var __bbfc_si=(typeof svelteLegacyInternal!=="undefined"?svelteLegacyInternal:svelte_internal);`
+
 export default {
   input: "index.js",
-  // Svelte 4 Runtime – Budibase stellt svelte/internal als window.svelte_internal bereit
   external: ["svelte", "svelte/internal"],
   output: {
-    sourcemap: process.env.ROLLUP_WATCH ? "inline" : false,
+    sourcemap: false,
     format: "iife",
     file: "dist/plugin.min.js",
     name: "plugin",
+    // banner wird VOR der IIFE ausgegeben → globale Vars verfügbar
+    banner: compatBanner,
     globals: {
-      "svelte": "svelte",
-      "svelte/internal": "svelte_internal",
+      "svelte": "__bbfc_svelte",
+      "svelte/internal": "__bbfc_si",
     },
   },
   plugins: [
@@ -88,7 +98,10 @@ export default {
     }),
     svg(),
     json(),
-    terser(),
+    terser({
+      // Banner nicht minifizieren/entfernen
+      format: { comments: false },
+    }),
     copy.default({ assets: ["schema.json", "package.json"] }),
     hash(),
     bundle(),

@@ -1,6 +1,6 @@
 {
   "name": "budibase-fullcalendar",
-  "version": "1.8.0",
+  "version": "2.4.0",
   "description": "simple calendar component for budibase",
   "license": "timschell",
   "svelte": "index.js",
@@ -10,12 +10,12 @@
     "watch": "rollup -cw rollup.config.mjs"
   },
   "dependencies": {
-    "@crownframework/svelte-error-boundary": "^1.0.3",
     "@fullcalendar/core": "5.11.5",
     "@fullcalendar/daygrid": "5.11.5",
-    "@fullcalendar/interaction": "^5.11.5",
+    "@fullcalendar/interaction": "5.11.5",
     "@fullcalendar/list": "5.11.5",
     "@fullcalendar/timegrid": "5.11.5",
+    "@crownframework/svelte-error-boundary": "^1.0.3",
     "dayjs": "^1.11.7",
     "svelte": "^3.59.2"
   },
